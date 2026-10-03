@@ -1,14 +1,16 @@
 import * as THREE from 'three'
 import atlasUrl from '../../assets/forest/woodland-atlas.png'
 import type { WorldData } from '../world/generateWorld'
-import { terrainCommon } from './terrainShader'
+import { groundObjectDepth, terrainCommon } from './terrainShader'
 import { FOREST_DEFAULTS, type ForestSettings } from './forestSettings'
+import { crystalDistance } from './crystalZones'
 
 const SPACING = 1.85
 const CHUNK_SIZE = 64
 
 const vertexShader = /* glsl */ `
 ${terrainCommon}
+${groundObjectDepth}
 in vec4 aTree; // x, z, size seed, species seed
 uniform float uSize;
 uniform float uVariation;
@@ -18,7 +20,7 @@ out float vTone;
 out float vDistance;
 void main() {
   vec2 p = aTree.xy;
-  float spacing = distance(cameraPosition, vec3(p.x, 0.0, p.y)) / 45.0;
+  float spacing = distance(cameraPosition, vec3(p.x, 0.0, p.y)) / uDetailDistance;
   float h = groundHeight(p, spacing);
   float size = uSize * mix(1.0, 0.65 + aTree.z * 0.7, uVariation);
   float species = aTree.w < uConifers ? 3.0 : floor(fract(aTree.w * 17.31) * 3.0);
@@ -32,6 +34,7 @@ void main() {
   vec4 center = viewMatrix * vec4(p.x, h + 0.04, p.y, 1.0);
   center.xy += vec2(cardUv.x - 0.5, cardUv.y - 0.09) * size;
   gl_Position = projectionMatrix * center;
+  gl_Position.z = groundObjectDepth(center.xyz, gl_Position);
   vec2 cell = vec2(mod(species, 2.0), 1.0 - floor(species / 2.0));
   // Inset from cell boundaries to prevent neighbouring sprites bleeding in.
   vUv = (cell + mix(vec2(0.006), vec2(0.994), cardUv)) * 0.5;
@@ -45,6 +48,7 @@ uniform sampler2D uAtlas;
 uniform float uBrightness;
 uniform float uWarmth;
 uniform float uShade;
+uniform float uAlphaCut;
 uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
@@ -57,7 +61,7 @@ void main() {
   // Opaque depth-writing cutouts need no per-tree transparency sorting.
   float width = max(fwidth(texel.a), 0.025);
   float alpha = smoothstep(0.3 - width, 0.3 + width, texel.a);
-  if (alpha < 0.01) discard;
+  if (alpha < uAlphaCut) discard;
   vec3 tint = mix(vec3(0.52, 1.0, 0.90), vec3(1.12, 1.0, 0.64), uWarmth);
   vec3 col = texel.rgb * tint * uBrightness * vTone;
   float crownHeight = fract(vUv.y * 2.0);
@@ -93,13 +97,14 @@ export class Forest {
       alphaToCoverage: true,
       uniforms: {
         uMacro: u.uMacro, uFlow: u.uFlow, uWorldSize: u.uWorldSize,
-        uHeightScale: u.uHeightScale, uTime: u.uTime,
+        uHeightScale: u.uHeightScale, uTime: u.uTime, uDetailDistance: u.uDetailDistance,
+        uPlainsRelief: u.uPlainsRelief, uMountainRelief: u.uMountainRelief, uMaxOctaves: u.uMaxOctaves,
         uTexturedForest: u.uTexturedForest, uForestDensity: u.uForestDensity, uForestShade: u.uForestShade,
         uFogColor: u.uFogColor, uFogNear: u.uFogNear, uFogFar: u.uFogFar,
         uAtlas: { value: null }, uSize: { value: this.settings.size },
         uVariation: { value: this.settings.variation }, uConifers: { value: this.settings.conifers },
         uBrightness: { value: this.settings.brightness }, uWarmth: { value: this.settings.warmth },
-        uShade: { value: this.settings.shade },
+        uShade: { value: this.settings.shade }, uAlphaCut: { value: 0.01 },
       },
     })
     this.group.name = 'painted-woodland'
@@ -129,7 +134,7 @@ export class Forest {
         const h = sample(x, z, 0)
         const coverage = THREE.MathUtils.smoothstep(sample(x, z, 3), 0.28, 0.82)
         if (h < 1.2 || h > 13 || sample(x, z, 1) > 0.15 || sample(x, z, 2) > 0.65
-          || random(id * 7 + 2) > coverage) continue
+          || random(id * 7 + 2) > coverage || crystalDistance(x, z) < 0.95) continue
         // Keep banks open and avoid steep rock. Probe around the root as well.
         const slope = Math.hypot(sample(x + 1, z, 0) - sample(x - 1, z, 0), sample(x, z + 1, 0) - sample(x, z - 1, 0)) / 2
         if (slope > 0.85 || sample(x + 1, z, 1) > 0.3 || sample(x - 1, z, 1) > 0.3
@@ -164,6 +169,12 @@ export class Forest {
     this.applySettings(this.settings)
   }
 
+  /** Without MSAA alpha-to-coverage does nothing, so cut the cards at half alpha */
+  setMultisample(enabled: boolean) {
+    this.material.alphaToCoverage = enabled
+    this.material.uniforms.uAlphaCut.value = enabled ? 0.01 : 0.5
+  }
+
   applySettings(settings: ForestSettings) {
     this.settings = { ...settings }
     const active = settings.mode === 'textured' && this.status === 'ready'
@@ -194,13 +205,13 @@ export class Forest {
   }
 }
 
-function random(seed: number) {
+export function random(seed: number) {
   let n = Math.imul(seed + 1, 747796405) + 2891336453
   n = Math.imul(n ^ (n >>> ((n >>> 28) + 4)), 277803737)
   return ((n ^ (n >>> 22)) >>> 0) / 4294967296
 }
 
-function sampleMacro(world: WorldData, x: number, z: number, channel: number) {
+export function sampleMacro(world: WorldData, x: number, z: number, channel: number) {
   const { resolution: res, worldSize, macro } = world
   const u = Math.max(0, Math.min(res - 1.001, x / worldSize * res - 0.5))
   const v = Math.max(0, Math.min(res - 1.001, z / worldSize * res - 0.5))

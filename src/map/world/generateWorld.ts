@@ -18,6 +18,7 @@ import { createNoise2D } from './noise'
 import {
   ARCHIPELAGO_ZONES,
   COASTLINE,
+  CRYSTAL_FORESTS,
   DESERTS,
   IMAGE_TO_WORLD,
   LAKES,
@@ -141,6 +142,7 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
     s: z.strength,
   }))
   const lakes = LAKES.map((l) => ({ c: toWorld(l.center), r: l.radius * IMAGE_TO_WORLD }))
+  const crystalWoods = CRYSTAL_FORESTS.map((c) => ({ c: toWorld(c.center), r: c.radius * IMAGE_TO_WORLD }))
   const deserts = DESERTS.map((d) => ({ c: toWorld(d.center), r: d.radius * IMAGE_TO_WORLD }))
 
   // --- 1. Smooth fields on a coarse lattice (cheap, upsampled bilinearly) ----
@@ -240,6 +242,11 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
       const arid = sampleCoarse(cArid, px, py)
       aridity[k] = arid
       forest[k] = f - Math.max(0, e - 9) * 0.03 - mountain[k] * 0.25 - arid * 0.8
+      // Crystal forests stand on wooded ground whatever the noise does; kept
+      // inside their lobed outline (0.7 radii at the narrowest)
+      for (const c of crystalWoods) {
+        forest[k] = Math.max(forest[k], 0.66 * smoothstep(0.7, 0.45, Math.hypot(px - c.c[0], py - c.c[1]) / c.r))
+      }
     }
   }
 

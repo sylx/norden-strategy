@@ -4,9 +4,12 @@ import { Heightfield } from '../world/Heightfield'
 import { MapCameraController } from './MapCameraController'
 import { TerrainQuadtree } from './TerrainQuadtree'
 import { Forest, type ForestTextureStatus } from './Forest'
+import { Crystals } from './Crystals'
 import { normalizeForestSettings, FOREST_DEFAULTS, type ForestSettings } from './forestSettings'
 import { ParchmentEffect } from './ParchmentEffect'
 import { PARCHMENT_DEFAULTS, type ParchmentSettings } from './parchmentSettings'
+import { normalizeTerrainSettings, TERRAIN_DEFAULTS, type TerrainSettings } from './terrainSettings'
+import { MAX_PIXEL_RATIO, normalizeRenderSettings, RENDER_DEFAULTS, type RenderSettings } from './renderSettings'
 
 /** Vertical exaggeration of the macro elevation */
 const HEIGHT_SCALE = 1.4
@@ -16,9 +19,20 @@ const TERRAIN_EXTENT = 4096
 export interface MapStats {
   fps: number
   tiles: number
+  vertices: number
   distance: number
   trees: number
   forestTexture: ForestTextureStatus
+  /** Drawing buffer size in device pixels */
+  width: number
+  height: number
+}
+
+export interface MapSettings {
+  forest?: ForestSettings
+  parchment?: ParchmentSettings
+  terrain?: TerrainSettings
+  render?: RenderSettings
 }
 
 /** Owns the three.js scene of the strategy map */
@@ -29,6 +43,7 @@ export class StrategyMap {
   private readonly scene = new THREE.Scene()
   private readonly terrain: TerrainQuadtree
   private readonly forest: Forest
+  private readonly crystals: Crystals
   private readonly parchment: ParchmentEffect
   private readonly macro: THREE.DataTexture
   private readonly flow: THREE.DataTexture
@@ -38,13 +53,13 @@ export class StrategyMap {
   private frames = 0
   private fpsTime = performance.now()
   private fps = 0
+  private renderSettings = { ...RENDER_DEFAULTS }
   onStats?: (stats: MapStats) => void
 
-  constructor(container: HTMLElement, world: WorldData, forestSettings: ForestSettings = FOREST_DEFAULTS,
-    parchmentSettings: ParchmentSettings = PARCHMENT_DEFAULTS) {
+  constructor(container: HTMLElement, world: WorldData, settings: MapSettings = {}) {
     this.container = container
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    // Antialiasing comes from the multisampled scene target (ParchmentEffect)
+    this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' })
     this.renderer.setClearColor(0x10264a)
     container.appendChild(this.renderer.domElement)
     this.renderer.domElement.style.display = 'block'
@@ -57,6 +72,8 @@ export class StrategyMap {
     for (let k = 0; k < world.macro.length; k += 4) maxElevation = Math.max(maxElevation, world.macro[k])
 
     this.terrain = new TerrainQuadtree({
+      world,
+      settings: normalizeTerrainSettings(settings.terrain ?? TERRAIN_DEFAULTS),
       macro: this.macro,
       flow: this.flow,
       worldSize: world.worldSize,
@@ -67,10 +84,12 @@ export class StrategyMap {
     })
     this.scene.add(this.terrain.mesh)
     this.forest = new Forest(world, this.terrain.material, HEIGHT_SCALE, this.renderer.capabilities.getMaxAnisotropy())
-    this.forest.applySettings(normalizeForestSettings(forestSettings))
+    this.forest.applySettings(normalizeForestSettings(settings.forest ?? FOREST_DEFAULTS))
     this.scene.add(this.forest.group)
+    this.crystals = new Crystals(world, this.terrain.material, HEIGHT_SCALE)
+    this.scene.add(this.crystals.mesh)
     this.parchment = new ParchmentEffect(this.renderer)
-    this.parchment.applySettings(parchmentSettings)
+    this.parchment.applySettings(settings.parchment ?? PARCHMENT_DEFAULTS)
 
     const s = world.worldSize
     this.controls = new MapCameraController(this.camera, this.renderer.domElement, new Heightfield(world), HEIGHT_SCALE, {
@@ -84,13 +103,14 @@ export class StrategyMap {
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(container)
-    this.resize()
+    this.setRenderSettings(settings.render ?? RENDER_DEFAULTS)
     this.renderer.setAnimationLoop(this.frame)
   }
 
   private resize() {
     const w = Math.max(1, this.container.clientWidth)
     const h = Math.max(1, this.container.clientHeight)
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO) * this.renderSettings.resolution)
     this.renderer.setSize(w, h)
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2())
     this.parchment.setSize(size.x, size.y, this.renderer.getPixelRatio())
@@ -100,6 +120,19 @@ export class StrategyMap {
 
   setForestSettings(settings: ForestSettings) {
     this.forest.applySettings(normalizeForestSettings(settings))
+  }
+
+  setTerrainSettings(settings: TerrainSettings) {
+    this.terrain.applySettings(normalizeTerrainSettings(settings))
+  }
+
+  setRenderSettings(value: RenderSettings) {
+    const settings = normalizeRenderSettings(value)
+    this.renderSettings = settings
+    this.terrain.material.uniforms.uMaxOctaves.value = settings.detailOctaves
+    this.parchment.setMultisample(settings.msaa)
+    this.forest.setMultisample(settings.msaa)
+    this.resize()
   }
 
   setParchmentSettings(settings: ParchmentSettings) {
@@ -119,8 +152,10 @@ export class StrategyMap {
       this.fps = (this.frames * 1000) / (now - this.fpsTime)
       this.frames = 0
       this.fpsTime = now
-      this.onStats?.({ fps: this.fps, tiles: this.terrain.tileCount, distance: this.controls.getView().distance,
-        trees: this.forest.count, forestTexture: this.forest.status })
+      this.onStats?.({ fps: this.fps, tiles: this.terrain.tileCount,
+        vertices: this.terrain.vertexCount, distance: this.controls.getView().distance,
+        trees: this.forest.count, forestTexture: this.forest.status,
+        width: this.renderer.domElement.width, height: this.renderer.domElement.height })
     }
   }
 
@@ -130,6 +165,7 @@ export class StrategyMap {
     this.controls.dispose()
     this.terrain.dispose()
     this.forest.dispose()
+    this.crystals.dispose()
     this.parchment.dispose()
     this.macro.dispose()
     this.flow.dispose()

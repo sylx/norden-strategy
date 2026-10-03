@@ -1,3 +1,5 @@
+import { crystalGlsl } from './crystalZones'
+
 /**
  * Terrain shader.
  *
@@ -13,6 +15,12 @@ uniform sampler2D uMacro;
 uniform sampler2D uFlow;
 uniform float uWorldSize;
 uniform float uHeightScale;
+// Camera distance per unit of the spacing that sets the vertex detail level
+uniform float uDetailDistance;
+uniform float uPlainsRelief;
+uniform float uMountainRelief;
+// Upper limit of the detail octaves, trading ground texture for speed
+uniform float uMaxOctaves;
 uniform float uTime;
 uniform float uTexturedForest;
 uniform float uForestDensity;
@@ -57,6 +65,8 @@ vec3 noised(vec2 p) {
   ) * 1.4;
 }
 
+${crystalGlsl()}
+
 // --- macro textures ----------------------------------------------------------
 // Smooth B-spline bicubic, so lighting shows no texel grid
 vec4 macroAt(vec2 world) {
@@ -90,13 +100,15 @@ const float DETAIL_BASE_FREQ = 0.22; // first octave wavelength ~4.5 units
 
 // Number of octaves whose wavelength is still resolved by a sample spacing
 float octavesFor(float spacing) {
-  return clamp(log2(1.0 / (DETAIL_BASE_FREQ * spacing * 2.5)) + 1.0, 0.0, 10.0);
+  return clamp(log2(1.0 / (DETAIL_BASE_FREQ * spacing * 2.5)) + 1.0, 0.0, uMaxOctaves);
 }
 
 float detailAmp(vec4 m, float desert) {
   float landish = smoothstep(-6.0, 0.5, m.r);
   float calmWater = 1.0 - smoothstep(0.25, 0.6, m.g);
-  return mix(0.7, 3.4, m.b) * landish * calmWater * (1.0 - desert * 0.6);
+  // The coastal lowland keeps its detail so the shoreline stays as it is
+  float plains = 0.7 * mix(1.0, uPlainsRelief, smoothstep(0.8, 2.5, m.r));
+  return mix(plains, 3.4 * uMountainRelief, m.b) * landish * calmWater * (1.0 - desert * 0.6);
 }
 
 // Fractal detail. Plains get soft rolling noise, mountains a ridged variant.
@@ -133,7 +145,9 @@ vec2 forestMask(vec4 m, vec2 p) {
   float edgeN = noised(p * 0.25 + 7.0).x * 0.14 + noised(p * 0.07 - 3.0).x * 0.1;
   float v = m.a + edgeN;
   float notRock = 1.0 - smoothstep(0.35, 0.8, m.b) * 0.8;
-  return vec2(smoothstep(0.38, 0.52, v), smoothstep(0.4, 0.95, v)) * notRock;
+  // Crystal forests replace the canopy with their own ground and clusters
+  float notCrystal = 1.0 - crystalMask(p);
+  return vec2(smoothstep(0.38, 0.52, v), smoothstep(0.4, 0.95, v)) * notRock * notCrystal;
 }
 
 // Union of hemispheres on a jittered lattice: rounded, overlapping crowns.
@@ -293,6 +307,22 @@ float groundHeight(vec2 p, float spacing) {
 }
 `
 
+/**
+ * Vertex-shader helper for things standing on the ground (trees, crystals).
+ * Distant terrain tiles are coarse and their straight edges pass above
+ * hollows, which would hide whole woods when zoomed out. The returned clip
+ * depth belongs to the point pulled towards the camera by a distance-scaled
+ * margin; the projected position is unchanged.
+ */
+export const groundObjectDepth = /* glsl */ `
+float groundObjectDepth(vec3 viewPos, vec4 clip) {
+  float d = length(viewPos);
+  float pull = min(d * 0.007, d * 0.5);
+  vec4 c = projectionMatrix * vec4(viewPos * (1.0 - pull / d), 1.0);
+  return c.z / c.w * clip.w;
+}
+`
+
 export const terrainVertexShader = /* glsl */ `
 ${terrainCommon}
 in vec4 aTile; // x0, z0, size, vertex spacing
@@ -302,8 +332,8 @@ void main() {
   vec2 p = aTile.xy + position.xz * aTile.z;
   // Detail level from the camera distance rather than the tile, so that
   // neighbouring tiles of different size agree along their shared edge.
-  // 45 ~ distance / vertex spacing at which the quadtree picks a tile.
-  float spacing = max(distance(cameraPosition, vec3(p.x, 0.0, p.y)) / 45.0, aTile.w * 0.5);
+  // uDetailDistance follows the distance / vertex spacing of the quadtree.
+  float spacing = max(distance(cameraPosition, vec3(p.x, 0.0, p.y)) / uDetailDistance, aTile.w * 0.5);
   float y = groundHeight(p, spacing);
   // Skirts (position.y = 1) hang below the tile to hide cracks
   y -= position.y * max(spacing * 3.0, 0.5);
@@ -531,8 +561,18 @@ void main() {
       albedo = mix(albedo, col, cover);
       N = normalize(mix(N, Nc, cover));
     }
+    // Crystal forest floor: pale frost with glowing veins
+    float crystal = crystalMask(p);
+    float crystalGlow = 0.0;
+    if (crystal > 0.0) {
+      float frostN = noised(p * 0.35 + 5.0).x * 0.5 + 0.5;
+      vec3 frost = mix(srgb(150.0, 176.0, 206.0), srgb(184.0, 164.0, 226.0), frostN);
+      albedo = mix(albedo, frost, crystal * 0.85);
+      float vein = smoothstep(0.92, 0.99, 1.0 - abs(noised(p * 0.55 - 3.0).x));
+      crystalGlow = crystal * (0.16 + 0.5 * vein * smoothstep(1.2, 0.3, footprint));
+    }
     // Lone trees dotting open country, once they span a few pixels
-    float treeVis = smoothstep(0.12, 0.05, footprint) * (1.0 - fm);
+    float treeVis = smoothstep(0.12, 0.05, footprint) * (1.0 - fm) * (1.0 - crystal);
     if (treeVis > 0.0 && uTexturedForest < 0.5) {
       float loose = (0.04 + smoothstep(0.15, 0.38, m.a) * 0.2)
         * (1.0 - rockiness) * (1.0 - desert) * (1.0 - snow);
@@ -548,7 +588,7 @@ void main() {
     }
 
     // Shade cast by woods onto open ground beside them
-    float woodShadow = clamp(dot(forestGrad, L.xz) * 2.5, 0.0, 1.0) * (1.0 - smoothstep(0.0, 0.3, fm));
+    float woodShadow = clamp(dot(forestGrad, L.xz) * 2.5, 0.0, 1.0) * (1.0 - smoothstep(0.0, 0.3, fm)) * (1.0 - crystal);
     albedo *= 1.0 - woodShadow * mix(0.35, uForestShade * uForestDensity * 0.5, uTexturedForest);
 
     // Beaches
@@ -571,6 +611,20 @@ void main() {
     color = albedo * (ambient + diff * 0.95 * sun);
     // Glint on snow
     color += sun * pow(max(dot(reflect(-L, N), V), 0.0), 20.0) * 0.12 * snow;
+    if (crystal > 0.0) {
+      // Slow breathing light, and shards twinkling as the view moves
+      float pulse = 0.7 + 0.3 * sin(uTime * 1.2 + noised(p * 0.06).x * 6.0);
+      color += srgb(120.0, 214.0, 240.0) * crystalGlow * pulse;
+      float glintVis = smoothstep(0.35, 0.08, footprint);
+      if (glintVis > 0.0) {
+        vec2 q = p * 2.5;
+        ivec2 cell = ivec2(floor(q));
+        float h = hash21(cell + ivec2(77, 13));
+        float dot0 = smoothstep(0.12, 0.0, length(fract(q) - (hash22(cell) * 0.8 + 0.1)));
+        float twinkle = pow(max(sin(uTime * (1.5 + 2.0 * h) + h * 40.0 + dot(V.xz, vec2(9.0, 7.0))), 0.0), 12.0);
+        color += vec3(0.9, 1.0, 1.0) * dot0 * twinkle * step(0.55, h) * glintVis * crystal;
+      }
+    }
 
     if (water > 0.0) {
       color = mix(color, shadeInlandWater(p, fl, wm, footprint, V, L, sun), water);

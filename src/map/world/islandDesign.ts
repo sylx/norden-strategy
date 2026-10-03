@@ -106,3 +106,14 @@ export const DESERTS: readonly Desert[] = [
   { center: [5700, 6050], radius: 1050 },
   { center: [4900, 6500], radius: 650 },
 ]
+
+/** Woods turned to crystal: glowing ground and crystal clusters instead of trees */
+export interface CrystalForest {
+  center: Vec2
+  radius: number
+}
+
+export const CRYSTAL_FORESTS: readonly CrystalForest[] = [
+  // The lone wood on the north-eastern cape
+  { center: [7240, 2328], radius: 50 },
+]

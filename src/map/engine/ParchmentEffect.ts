@@ -24,6 +24,7 @@ uniform float uPaper;
 uniform float uPaperScale;
 uniform float uFade;
 uniform float uVignette;
+uniform bool uGrade;
 varying vec2 vUv;
 
 // Grading and ink/paper colours are in display space, as in battle's effect.
@@ -66,6 +67,10 @@ vec2 groundXZ(vec2 uv) {
 }
 
 void main() {
+  if (!uGrade) {
+    gl_FragColor = linearToOutputTexel(vec4(texture2D(tColor, vUv).rgb, 1));
+    return;
+  }
   // The map is already lit; no second ACES tone map is applied here.
   vec3 base = clamp(linearToOutputTexel(vec4(texture2D(tColor, vUv).rgb * uExposure, 1)).rgb, 0.0, 1.0);
   float l = dot(base, vec3(0.299, 0.587, 0.114));
@@ -93,18 +98,22 @@ void main() {
 }
 `
 
-/** One multisampled scene capture and one full-screen pass. */
+/**
+ * One multisampled scene capture and one full-screen pass. The capture also
+ * provides the map's antialiasing, so it runs with the effect turned off too.
+ */
 export class ParchmentEffect {
-  private enabled = true
+  private readonly maxSamples: number
   private readonly target: THREE.WebGLRenderTarget
   private readonly material: THREE.ShaderMaterial
   private readonly quad: FullScreenQuad
 
   constructor(renderer: THREE.WebGLRenderer) {
+    this.maxSamples = Math.min(4, renderer.capabilities.maxSamples)
     this.target = new THREE.WebGLRenderTarget(1, 1, {
       type: renderer.extensions.has('EXT_color_buffer_float') ? THREE.HalfFloatType : THREE.UnsignedByteType,
       // Forest alpha-to-coverage requires MSAA on the scene target too.
-      samples: Math.min(4, renderer.capabilities.maxSamples),
+      samples: this.maxSamples,
       // Keep depth testing for trees/terrain, but no depth sampling or resolve.
       depthBuffer: true,
       resolveDepthBuffer: false,
@@ -118,7 +127,7 @@ export class ParchmentEffect {
         uInvProjection: { value: new THREE.Matrix4() }, uCameraWorld: { value: new THREE.Matrix4() },
         uExposure: { value: 1 }, uSaturation: { value: 1 }, uSepia: { value: 0 },
         uPaper: { value: 0 }, uPaperScale: { value: 48 }, uFade: { value: 0 },
-        uVignette: { value: 0 },
+        uVignette: { value: 0 }, uGrade: { value: true },
       },
     })
     this.quad = new FullScreenQuad(this.material)
@@ -127,8 +136,8 @@ export class ParchmentEffect {
 
   applySettings(value: ParchmentSettings) {
     const settings = normalizeParchmentSettings(value)
-    this.enabled = settings.enabled
     const u = this.material.uniforms
+    u.uGrade.value = settings.enabled
     u.uExposure.value = settings.exposure
     u.uSaturation.value = settings.saturation
     u.uSepia.value = settings.sepia
@@ -138,6 +147,14 @@ export class ParchmentEffect {
     u.uVignette.value = settings.vignette
   }
 
+  setMultisample(enabled: boolean) {
+    const samples = enabled ? this.maxSamples : 0
+    if (samples === this.target.samples) return
+    this.target.samples = samples
+    // Reallocated with the new sample count on the next render
+    this.target.dispose()
+  }
+
   setSize(width: number, height: number, pixelRatio: number) {
     this.target.setSize(width, height)
     this.material.uniforms.uResolution.value.set(width, height)
@@ -145,7 +162,6 @@ export class ParchmentEffect {
   }
 
   render(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
-    if (!this.enabled) { renderer.render(scene, camera); return }
     const previous = renderer.getRenderTarget()
     try {
       renderer.setRenderTarget(this.target)

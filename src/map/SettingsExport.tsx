@@ -1,18 +1,22 @@
 import { useState } from 'react'
 import type { ForestSettings } from './engine/forestSettings'
 import type { ParchmentSettings } from './engine/parchmentSettings'
+import type { TerrainSettings } from './engine/terrainSettings'
+import type { RenderSettings } from './engine/renderSettings'
 
 interface Props {
   forest: ForestSettings
   parchment: ParchmentSettings
+  terrain: TerrainSettings
+  render: RenderSettings
 }
 
 function selectJson(node: HTMLTextAreaElement | null) {
   if (node) { node.focus(); node.select() }
 }
 
-export function SettingsExport({ forest, parchment }: Props) {
-  const json = JSON.stringify({ forest, parchment }, null, 2)
+export function SettingsExport({ forest, parchment, terrain, render }: Props) {
+  const json = JSON.stringify({ forest, parchment, terrain, render }, null, 2)
   const [copiedJson, setCopiedJson] = useState<string | null>(null)
   const [manualCopy, setManualCopy] = useState(false)
 
@@ -33,8 +37,8 @@ export function SettingsExport({ forest, parchment }: Props) {
       <button type="button" onClick={copy}>設定JSONをコピー</button>
       <p className="map-controls__note" role="status">
         {manualCopy ? '自動コピーできませんでした。下のJSONを選択してコピーしてください。'
-          : copiedJson === json ? '森と羊皮紙の設定をコピーしました。'
-            : '森と羊皮紙の現在の設定をまとめてコピーします。'}
+          : copiedJson === json ? 'すべての描画設定をコピーしました。'
+            : '森・羊皮紙・地形・描画品質の設定をまとめてコピーします。'}
       </p>
       {manualCopy && (
         <textarea aria-label="現在の描画設定JSON" readOnly value={json} rows={8}
