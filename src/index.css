@@ -1,0 +1,13 @@
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #10264a;
+  font-family: 'Noto Sans JP', system-ui, sans-serif;
+  overscroll-behavior: none;
+}

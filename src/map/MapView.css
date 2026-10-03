@@ -1,0 +1,40 @@
+.map-view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #10264a;
+}
+
+.map-view__canvas {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+.map-view__canvas:active {
+  cursor: grabbing;
+}
+
+.map-view__loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #e8dcc0;
+  font-size: 18px;
+  letter-spacing: 0.1em;
+  pointer-events: none;
+}
+
+.map-view__stats {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.45);
+  color: #cfd8e0;
+  font: 12px/1.6 ui-monospace, monospace;
+  pointer-events: none;
+}
