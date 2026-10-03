@@ -10,6 +10,12 @@ import { ParchmentEffect } from './ParchmentEffect'
 import { PARCHMENT_DEFAULTS, type ParchmentSettings } from './parchmentSettings'
 import { normalizeTerrainSettings, TERRAIN_DEFAULTS, type TerrainSettings } from './terrainSettings'
 import { MAX_PIXEL_RATIO, normalizeRenderSettings, RENDER_DEFAULTS, type RenderSettings } from './renderSettings'
+import { PLACES } from '../world/placeLayout'
+import { IMAGE_TO_WORLD } from '../world/islandDesign'
+import { Roads } from './Roads'
+import { Cities } from './Cities'
+import { PlaceLabels } from './PlaceLabels'
+import { normalizePlaceSettings, PLACE_DEFAULTS, type PlaceSettings } from './placeSettings'
 
 /** Vertical exaggeration of the macro elevation */
 const HEIGHT_SCALE = 1.4
@@ -23,7 +29,7 @@ export interface MapStats {
   distance: number
   trees: number
   forestTexture: ForestTextureStatus
-  /** Drawing buffer size in device pixels */
+  /** Size of the scene capture in device pixels (render resolution) */
   width: number
   height: number
 }
@@ -33,6 +39,7 @@ export interface MapSettings {
   parchment?: ParchmentSettings
   terrain?: TerrainSettings
   render?: RenderSettings
+  places?: PlaceSettings
 }
 
 /** Owns the three.js scene of the strategy map */
@@ -41,9 +48,14 @@ export class StrategyMap {
   readonly camera: THREE.PerspectiveCamera
   readonly controls: MapCameraController
   private readonly scene = new THREE.Scene()
+  /** Drawn after the post-processing, at full resolution whatever the render resolution (cities, emblems) */
+  private readonly overlay = new THREE.Scene()
   private readonly terrain: TerrainQuadtree
   private readonly forest: Forest
   private readonly crystals: Crystals
+  private readonly roads: Roads
+  private readonly cities: Cities
+  private readonly labels: PlaceLabels
   private readonly parchment: ParchmentEffect
   private readonly macro: THREE.DataTexture
   private readonly flow: THREE.DataTexture
@@ -54,6 +66,9 @@ export class StrategyMap {
   private fpsTime = performance.now()
   private fps = 0
   private renderSettings = { ...RENDER_DEFAULTS }
+  /** CSS px per world unit at view depth 1 */
+  private pxScale = 1
+  private viewSize = { width: 1, height: 1 }
   onStats?: (stats: MapStats) => void
 
   constructor(container: HTMLElement, world: WorldData, settings: MapSettings = {}) {
@@ -71,6 +86,8 @@ export class StrategyMap {
     let maxElevation = 0
     for (let k = 0; k < world.macro.length; k += 4) maxElevation = Math.max(maxElevation, world.macro[k])
 
+    const heights = new Heightfield(world)
+    const maxHeight = (maxElevation + 9) * HEIGHT_SCALE
     this.terrain = new TerrainQuadtree({
       world,
       settings: normalizeTerrainSettings(settings.terrain ?? TERRAIN_DEFAULTS),
@@ -80,7 +97,7 @@ export class StrategyMap {
       extent: TERRAIN_EXTENT,
       heightScale: HEIGHT_SCALE,
       // Noise detail and tree canopies rise a few units above the macro peaks
-      maxHeight: (maxElevation + 9) * HEIGHT_SCALE,
+      maxHeight,
     })
     this.scene.add(this.terrain.mesh)
     this.forest = new Forest(world, this.terrain.material, HEIGHT_SCALE, this.renderer.capabilities.getMaxAnisotropy())
@@ -88,11 +105,18 @@ export class StrategyMap {
     this.scene.add(this.forest.group)
     this.crystals = new Crystals(world, this.terrain.material, HEIGHT_SCALE)
     this.scene.add(this.crystals.mesh)
+    this.roads = new Roads(world.roads, this.terrain.material, maxHeight)
+    this.scene.add(this.roads.mesh)
+    this.cities = new Cities(PLACES, this.terrain.material, heights, HEIGHT_SCALE,
+      this.renderer.capabilities.getMaxAnisotropy())
+    this.overlay.add(this.cities.group)
+    this.labels = new PlaceLabels(container, PLACES, heights, HEIGHT_SCALE)
+    this.setPlaceSettings(settings.places ?? PLACE_DEFAULTS)
     this.parchment = new ParchmentEffect(this.renderer)
     this.parchment.applySettings(settings.parchment ?? PARCHMENT_DEFAULTS)
 
     const s = world.worldSize
-    this.controls = new MapCameraController(this.camera, this.renderer.domElement, new Heightfield(world), HEIGHT_SCALE, {
+    this.controls = new MapCameraController(this.camera, this.renderer.domElement, heights, HEIGHT_SCALE, {
       minDistance: 14,
       maxDistance: 1500,
       minPitch: 34,
@@ -110,12 +134,17 @@ export class StrategyMap {
   private resize() {
     const w = Math.max(1, this.container.clientWidth)
     const h = Math.max(1, this.container.clientHeight)
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO) * this.renderSettings.resolution)
+    // The canvas is always at full resolution; the scene capture is scaled down
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO))
     this.renderer.setSize(w, h)
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2())
-    this.parchment.setSize(size.x, size.y, this.renderer.getPixelRatio())
+    this.parchment.setSize(size.x, size.y, this.renderer.getPixelRatio(), this.renderSettings.resolution)
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
+    this.viewSize = { width: w, height: h }
+    this.pxScale = h / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2))
+    this.roads.setPixelScale(this.pxScale)
+    this.cities.setPixelScale(this.pxScale)
   }
 
   setForestSettings(settings: ForestSettings) {
@@ -135,6 +164,21 @@ export class StrategyMap {
     this.resize()
   }
 
+  /** Ground point under a client position, in the image space of islandDesign / placeLayout */
+  pickImagePoint(clientX: number, clientY: number): [number, number] | null {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1)
+    const p = this.controls.pickGround(ndc)
+    return p ? [Math.round(p.x / IMAGE_TO_WORLD), Math.round(p.z / IMAGE_TO_WORLD)] : null
+  }
+
+  setPlaceSettings(value: PlaceSettings) {
+    const settings = normalizePlaceSettings(value)
+    this.roads.applySettings(settings)
+    this.cities.applySettings(settings)
+    this.labels.applySettings(settings)
+  }
+
   setParchmentSettings(settings: ParchmentSettings) {
     this.parchment.applySettings(settings)
   }
@@ -145,7 +189,12 @@ export class StrategyMap {
     this.controls.update(dt)
     this.terrain.update(this.camera)
     this.terrain.material.uniforms.uTime.value = now / 1000
+    const art = this.cities.update(this.controls.getView().distance)
+    this.labels.update(this.camera, this.viewSize.width, this.viewSize.height, this.pxScale, art)
     this.parchment.render(this.renderer, this.scene, this.camera)
+    this.renderer.autoClear = false
+    this.renderer.render(this.overlay, this.camera)
+    this.renderer.autoClear = true
 
     this.frames++
     if (now - this.fpsTime >= 500) {
@@ -155,7 +204,7 @@ export class StrategyMap {
       this.onStats?.({ fps: this.fps, tiles: this.terrain.tileCount,
         vertices: this.terrain.vertexCount, distance: this.controls.getView().distance,
         trees: this.forest.count, forestTexture: this.forest.status,
-        width: this.renderer.domElement.width, height: this.renderer.domElement.height })
+        ...this.parchment.sceneSize })
     }
   }
 
@@ -166,6 +215,9 @@ export class StrategyMap {
     this.terrain.dispose()
     this.forest.dispose()
     this.crystals.dispose()
+    this.roads.dispose()
+    this.cities.dispose()
+    this.labels.dispose()
     this.parchment.dispose()
     this.macro.dispose()
     this.flow.dispose()

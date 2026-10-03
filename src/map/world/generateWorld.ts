@@ -26,6 +26,8 @@ import {
   WORLD_SIZE,
   type Vec2,
 } from './islandDesign'
+import { PLACE_KINDS, PLACES, ROAD_LINKS } from './placeLayout'
+import { planRoads, type RoadPath } from './roads'
 
 export interface WorldData {
   resolution: number
@@ -34,6 +36,10 @@ export interface WorldData {
   macro: Float32Array
   /** RGBA, same layout as macro */
   flow: Float32Array
+  /** Roads between the cities of placeLayout.ts */
+  roads: RoadPath[]
+  /** Problems with the city layout (cities on water, unreachable links) */
+  warnings: string[]
 }
 
 export interface GenerateOptions {
@@ -250,6 +256,29 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
     }
   }
 
+  // --- 2b. Level the ground under the cities --------------------------------
+  // Before drainage, so rivers find their way across the levelled ground.
+  for (const place of PLACES) {
+    const r = PLACE_KINDS[place.type].radius
+    const ci = place.x / cell - 0.5
+    const cj = place.z / cell - 0.5
+    const reach = Math.ceil((r * 1.6) / cell)
+    let sum = 0
+    let count = 0
+    forCells(ci, cj, reach, RES, (k, d) => {
+      if (d * cell <= r * 0.5 && elev[k] > 0) { sum += elev[k]; count++ }
+    })
+    if (count === 0) continue
+    const target = sum / count
+    forCells(ci, cj, reach, RES, (k, d) => {
+      // Sea cells stay sea, so harbours keep their coastline
+      if (elev[k] <= 0) return
+      const w = smoothstep(r * 1.6, r * 0.9, d * cell)
+      elev[k] += (target - elev[k]) * w
+      mountain[k] *= 1 - w
+    })
+  }
+
   // --- 3. Drainage: priority-flood from the sea ------------------------------
   // The flood tree doubles as the flow network: every land cell drains into
   // the neighbour that reached it.
@@ -391,7 +420,31 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
     }
   }
 
-  // --- 5. Pack ---------------------------------------------------------------
+  // --- 5. Roads ---------------------------------------------------------------
+  const lake = new Uint8Array(N)
+  for (let k = 0; k < N; k++) lake[k] = elev[k] > 0 && filled[k] - routed[k] > LAKE_DEPTH ? 1 : 0
+  const { roads, warnings } = planRoads(
+    { resolution: RES, cell, elev, water, lake, mountain },
+    PLACES,
+    ROAD_LINKS,
+  )
+
+  // No trees on the cities and along the roads
+  const clear = new Float32Array(N).fill(1)
+  const clearDisc = (x: number, z: number, inner: number, outer: number) => {
+    forCells(x / cell - 0.5, z / cell - 0.5, Math.ceil(outer / cell), RES, (k, d) => {
+      clear[k] = Math.min(clear[k], smoothstep(inner, outer, d * cell))
+    })
+  }
+  for (const place of PLACES) {
+    const r = PLACE_KINDS[place.type].radius
+    clearDisc(place.x, place.z, r * 0.9, r * 1.5)
+  }
+  for (const road of roads) {
+    for (let i = 0; i < road.points.length; i += 2) clearDisc(road.points[i], road.points[i + 1], 1.3, 2.4)
+  }
+
+  // --- 6. Pack ---------------------------------------------------------------
   const macro = new Float32Array(N * 4)
   const flow = new Float32Array(N * 4)
   for (let k = 0; k < N; k++) {
@@ -405,7 +458,7 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
     macro[k * 4] = e
     macro[k * 4 + 1] = e > 0 ? w : 0
     macro[k * 4 + 2] = mountain[k]
-    macro[k * 4 + 3] = smoothstep(0.5, 0.64, forest[k]) * smoothstep(1, 6, coastDist[k]) * (1 - w)
+    macro[k * 4 + 3] = smoothstep(0.5, 0.64, forest[k]) * smoothstep(1, 6, coastDist[k]) * (1 - w) * clear[k]
     const lake = filled[k] - routed[k] > LAKE_DEPTH
     flow[k * 4] = lake ? 0 : flowX[k]
     flow[k * 4 + 1] = lake ? 0 : flowY[k]
@@ -413,5 +466,19 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
     flow[k * 4 + 3] = riverSize[k]
   }
 
-  return { resolution: RES, worldSize: WORLD_SIZE, macro, flow }
+  return { resolution: RES, worldSize: WORLD_SIZE, macro, flow, roads, warnings }
+}
+
+/** Visits the cells within `reach` cells of a point given in cell coordinates */
+function forCells(ci: number, cj: number, reach: number, res: number, visit: (k: number, dist: number) => void) {
+  const i0 = Math.max(0, Math.floor(ci - reach))
+  const i1 = Math.min(res - 1, Math.ceil(ci + reach))
+  const j0 = Math.max(0, Math.floor(cj - reach))
+  const j1 = Math.min(res - 1, Math.ceil(cj + reach))
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      const d = Math.hypot(i - ci, j - cj)
+      if (d <= reach) visit(j * res + i, d)
+    }
+  }
 }

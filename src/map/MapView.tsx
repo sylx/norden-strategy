@@ -9,7 +9,10 @@ import { TerrainControls } from './TerrainControls'
 import { readTerrainSettings, saveTerrainSettings, type TerrainSettings } from './engine/terrainSettings'
 import { RenderControls } from './RenderControls'
 import { readRenderSettings, saveRenderSettings, type RenderSettings } from './engine/renderSettings'
+import { PlaceControls } from './PlaceControls'
+import { readPlaceSettings, savePlaceSettings, type PlaceSettings } from './engine/placeSettings'
 import { SettingsExport } from './SettingsExport'
+import { PLACE_POSITIONS, PLACES } from './world/placeLayout'
 import './MapView.css'
 
 declare global {
@@ -30,6 +33,10 @@ export default function MapView() {
   const terrainSettingsRef = useRef(terrainSettings)
   const [renderSettings, setRenderSettings] = useState(readRenderSettings)
   const renderSettingsRef = useRef(renderSettings)
+  const [placeSettings, setPlaceSettings] = useState(readPlaceSettings)
+  const placeSettingsRef = useRef(placeSettings)
+  const [warnings, setWarnings] = useState<string[]>([])
+  const [picked, setPicked] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<MapStats | null>(null)
 
@@ -41,11 +48,14 @@ export default function MapView() {
     const job = loadWorld()
     job.promise.then((world) => {
       if (cancelled) return
+      for (const warning of world.warnings) console.warn('[placeLayout]', warning)
+      setWarnings(world.warnings)
       map = new StrategyMap(container, world, {
         forest: forestSettingsRef.current,
         parchment: parchmentSettingsRef.current,
         terrain: terrainSettingsRef.current,
         render: renderSettingsRef.current,
+        places: placeSettingsRef.current,
       })
       mapRef.current = map
       map.onStats = setStats
@@ -60,6 +70,30 @@ export default function MapView() {
       map?.dispose()
       mapRef.current = null
       if (window.__strategyMap === map) delete window.__strategyMap
+    }
+  }, [])
+
+  // Dev only: a click (not a drag) shows the image coordinates for placeLayout.ts
+  useEffect(() => {
+    const container = containerRef.current
+    if (!import.meta.env.DEV || !container) return
+    let down: { x: number; y: number } | null = null
+    const onDown = (e: PointerEvent) => { down = e.isPrimary ? { x: e.clientX, y: e.clientY } : null }
+    const onUp = (e: PointerEvent) => {
+      if (!down || !e.isPrimary || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return
+      down = null
+      const point = mapRef.current?.pickImagePoint(e.clientX, e.clientY)
+      if (!point) return
+      const text = `[${point[0]}, ${point[1]}]`
+      setPicked(`${text}${describeNearest(point)}`)
+      navigator.clipboard?.writeText(text).then(
+        () => setPicked(`${text}${describeNearest(point)}（コピー済み）`), () => {})
+    }
+    container.addEventListener('pointerdown', onDown)
+    container.addEventListener('pointerup', onUp)
+    return () => {
+      container.removeEventListener('pointerdown', onDown)
+      container.removeEventListener('pointerup', onUp)
     }
   }, [])
 
@@ -84,6 +118,13 @@ export default function MapView() {
     saveRenderSettings(settings)
   }
 
+  const changePlaceSettings = (settings: PlaceSettings) => {
+    placeSettingsRef.current = settings
+    setPlaceSettings(settings)
+    mapRef.current?.setPlaceSettings(settings)
+    savePlaceSettings(settings)
+  }
+
   const changeParchmentSettings = (settings: ParchmentSettings) => {
     parchmentSettingsRef.current = settings
     setParchmentSettings(settings)
@@ -97,7 +138,8 @@ export default function MapView() {
       {loading && <div className="map-view__loading">地図を生成中…</div>}
       <aside className="map-controls" aria-label="地図の描画設定">
         <SettingsExport forest={forestSettings} parchment={parchmentSettings} terrain={terrainSettings}
-          render={renderSettings} />
+          render={renderSettings} places={placeSettings} />
+        <PlaceControls settings={placeSettings} onChange={changePlaceSettings} warnings={warnings} />
         <RenderControls settings={renderSettings} onChange={changeRenderSettings}
           width={stats?.width} height={stats?.height} fps={stats?.fps} />
         <ParchmentControls settings={parchmentSettings} onChange={changeParchmentSettings} />
@@ -108,8 +150,21 @@ export default function MapView() {
       {import.meta.env.DEV && stats && (
         <div className="map-view__stats">
           {stats.fps.toFixed(0)} fps / {stats.tiles} tiles / {(stats.vertices / 1000).toFixed(0)}k verts / {stats.trees.toLocaleString()} trees / dist {stats.distance.toFixed(0)}
+          {picked && <div>クリック地点 {picked}</div>}
         </div>
       )}
     </div>
   )
+}
+
+/** Nearest city to an image-space point, e.g. " / P011 コルネリア から 120px" */
+function describeNearest([x, y]: [number, number]): string {
+  let nearest: { id: string; d: number } | null = null
+  for (const [id, [px, py]] of Object.entries(PLACE_POSITIONS)) {
+    const d = Math.hypot(px - x, py - y)
+    if (!nearest || d < nearest.d) nearest = { id, d }
+  }
+  if (!nearest || nearest.d > 400) return ''
+  const name = PLACES.find((p) => p.id === nearest.id)?.name ?? ''
+  return ` / ${nearest.id} ${name} から ${Math.round(nearest.d)}px`
 }

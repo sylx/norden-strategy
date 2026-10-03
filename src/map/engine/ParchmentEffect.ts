@@ -101,6 +101,9 @@ void main() {
 /**
  * One multisampled scene capture and one full-screen pass. The capture also
  * provides the map's antialiasing, so it runs with the effect turned off too.
+ *
+ * The scene is captured at the reduced render resolution and the pass writes
+ * the full-resolution output, so whatever is drawn after it stays sharp.
  */
 export class ParchmentEffect {
   private readonly maxSamples: number
@@ -155,10 +158,16 @@ export class ParchmentEffect {
     this.target.dispose()
   }
 
-  setSize(width: number, height: number, pixelRatio: number) {
-    this.target.setSize(width, height)
+  /** width / height: full drawing buffer; resolution: scale of the scene capture */
+  setSize(width: number, height: number, pixelRatio: number, resolution: number) {
+    this.target.setSize(Math.max(1, Math.round(width * resolution)), Math.max(1, Math.round(height * resolution)))
     this.material.uniforms.uResolution.value.set(width, height)
     this.material.uniforms.uPixelRatio.value = pixelRatio
+  }
+
+  /** Size of the scene capture in device pixels */
+  get sceneSize() {
+    return { width: this.target.width, height: this.target.height }
   }
 
   render(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {

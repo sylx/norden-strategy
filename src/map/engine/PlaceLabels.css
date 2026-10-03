@@ -1,0 +1,37 @@
+.place-labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.place-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  color: #fff9df;
+  font: 700 13px/1.2 "Hiragino Mincho ProN", "Yu Mincho", serif;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 2px #000, 0 0 3px #000, 0 1px 4px #000c;
+  user-select: none;
+  will-change: transform;
+}
+
+.place-label img {
+  width: var(--place-label-emblem, 20px);
+  height: var(--place-label-emblem, 20px);
+  filter: drop-shadow(0 0 2px #000a);
+}
+
+.place-labels[hidden],
+.place-label[hidden] {
+  display: none;
+}
+
+.place-labels--emblems .place-label img {
+  display: none;
+}
