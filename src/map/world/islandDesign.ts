@@ -117,3 +117,18 @@ export const CRYSTAL_FORESTS: readonly CrystalForest[] = [
   // The lone wood on the north-eastern cape
   { center: [7240, 2328], radius: 50 },
 ]
+
+/**
+ * Impact craters: a raised rocky rim around a dry, sunken floor with a
+ * central peak, and a skirt of ejecta fading out beyond the rim.
+ * `radius` is the rim's radius (px); it overrides the terrain under it.
+ */
+export interface Crater {
+  center: Vec2
+  radius: number
+}
+
+export const CRATERS: readonly Crater[] = [
+  // The empty south-west between Caldea, Halvan and Dalm
+  { center: [3162, 6701], radius: 200 },
+]

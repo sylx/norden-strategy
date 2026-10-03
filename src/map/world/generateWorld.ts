@@ -18,6 +18,7 @@ import { createNoise2D } from './noise'
 import {
   ARCHIPELAGO_ZONES,
   COASTLINE,
+  CRATERS,
   CRYSTAL_FORESTS,
   DESERTS,
   IMAGE_TO_WORLD,
@@ -48,6 +49,13 @@ export interface GenerateOptions {
 }
 
 const SEA_FLOOR = -40
+
+/** Crater shape: elevation of the rim crest, the floor and the central peak above the floor */
+const CRATER_RIM = 10
+const CRATER_FLOOR = 1.5
+const CRATER_PEAK = 5
+/** Reach of the ejecta, in rim radii */
+const CRATER_REACH = 1.75
 
 const smoothstep = (e0: number, e1: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)))
@@ -150,6 +158,7 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
   const lakes = LAKES.map((l) => ({ c: toWorld(l.center), r: l.radius * IMAGE_TO_WORLD }))
   const crystalWoods = CRYSTAL_FORESTS.map((c) => ({ c: toWorld(c.center), r: c.radius * IMAGE_TO_WORLD }))
   const deserts = DESERTS.map((d) => ({ c: toWorld(d.center), r: d.radius * IMAGE_TO_WORLD }))
+  const craters = CRATERS.map((c) => ({ c: toWorld(c.center), r: c.radius * IMAGE_TO_WORLD }))
 
   // --- 1. Smooth fields on a coarse lattice (cheap, upsampled bilinearly) ----
   const C = 256
@@ -210,6 +219,8 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
   const forest = new Float32Array(N)
   const coastDist = new Float32Array(N)
   const aridity = new Float32Array(N)
+  /** 1 on crater floors: dry ground, no lakes, no rivers */
+  const craterFloor = new Float32Array(N)
 
   for (let j = 0; j < RES; j++) {
     for (let i = 0; i < RES; i++) {
@@ -239,6 +250,26 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
           const q = Math.hypot(px - l.c[0], py - l.c[1]) / l.r + n2.noise(px * 0.08, py * 0.08) * 0.35
           e -= 4 * smoothstep(1.4, 0.6, q)
         }
+
+        for (const c of craters) {
+          const q = Math.hypot(px - c.c[0], py - c.c[1]) / c.r + n.fbm(px * 0.03, py * 0.03, 3) * 0.06
+          if (q >= CRATER_REACH) continue
+          const rim = CRATER_RIM * (1 + n2.fbm(px * 0.02 + 23.5, py * 0.02, 3) * 0.3)
+          if (q <= 1) {
+            // Bowl steepening towards the rim, with the rebound peak in the middle
+            const wall = Math.pow(smoothstep(0.45, 1, q), 1.6)
+            e = CRATER_FLOOR + (rim - CRATER_FLOOR) * wall + CRATER_PEAK * Math.exp(-((q / 0.14) ** 2))
+          } else {
+            // The outer slope falls into the surrounding ground
+            e += (rim - e) * (1 - smoothstep(1, CRATER_REACH, q)) ** 2.5
+          }
+          const rock = Math.max(
+            smoothstep(0.6, 0.95, q) * smoothstep(1.45, 1, q) * 0.85,
+            Math.exp(-((q / 0.16) ** 2)) * 0.7,
+          )
+          mountain[k] = Math.max(mountain[k] * smoothstep(0.9, 1.4, q), rock)
+          craterFloor[k] = Math.max(craterFloor[k], smoothstep(1.02, 0.9, q))
+        }
       } else {
         e = Math.max(d * 0.15 - 8 * (1 - Math.exp(d / 10)), SEA_FLOOR)
       }
@@ -247,7 +278,7 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
       const f = n2.fbm(px * 0.011 + 90, py * 0.011 - 30, 5) * 0.5 + 0.5
       const arid = sampleCoarse(cArid, px, py)
       aridity[k] = arid
-      forest[k] = f - Math.max(0, e - 9) * 0.03 - mountain[k] * 0.25 - arid * 0.8
+      forest[k] = f - Math.max(0, e - 9) * 0.03 - mountain[k] * 0.25 - arid * 0.8 - craterFloor[k]
       // Crystal forests stand on wooded ground whatever the noise does; kept
       // inside their lobed outline (0.7 radii at the narrowest)
       for (const c of crystalWoods) {
@@ -335,7 +366,7 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
 
   const acc = new Float32Array(N)
   for (let k = 0; k < N; k++) {
-    if (elev[k] > 0) acc[k] = (0.6 + Math.max(0, forest[k])) * (1 - 0.9 * aridity[k])
+    if (elev[k] > 0) acc[k] = (0.6 + Math.max(0, forest[k])) * (1 - 0.9 * aridity[k]) * (1 - craterFloor[k])
   }
   for (let o = orderLen - 1; o >= 0; o--) {
     const k = order[o]
@@ -351,6 +382,8 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
   const RIVER_MIN_ACC = 1400 / (cell * cell)
   const LAKE_DEPTH = 1.6
   const isRiver = (k: number) => elev[k] > 0 && acc[k] >= RIVER_MIN_ACC
+  // Crater floors stay dry instead of filling up
+  const isLake = (k: number) => elev[k] > 0 && craterFloor[k] <= 0 && filled[k] - routed[k] > LAKE_DEPTH
 
   // Main upstream branch of every river cell, to walk paths in both directions
   const mainChild = new Int32Array(N).fill(-1)
@@ -386,7 +419,7 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
 
   for (let k = 0; k < N; k++) {
     if (elev[k] <= 0) continue
-    if (filled[k] - routed[k] > LAKE_DEPTH) {
+    if (isLake(k)) {
       water[k] = 1
       continue
     }
@@ -422,7 +455,7 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
 
   // --- 5. Roads ---------------------------------------------------------------
   const lake = new Uint8Array(N)
-  for (let k = 0; k < N; k++) lake[k] = elev[k] > 0 && filled[k] - routed[k] > LAKE_DEPTH ? 1 : 0
+  for (let k = 0; k < N; k++) lake[k] = isLake(k) ? 1 : 0
   const { roads, warnings } = planRoads(
     { resolution: RES, cell, elev, water, lake, mountain },
     PLACES,
@@ -452,14 +485,14 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
     const w = water[k]
     if (e > 0) {
       // Lakes become flat water surfaces; rivers cut a shallow bed
-      if (filled[k] - routed[k] > LAKE_DEPTH) e = filled[k] - 0.9
+      if (isLake(k)) e = filled[k] - 0.9
       else e = Math.max(0.05, e - w * 0.35)
     }
     macro[k * 4] = e
     macro[k * 4 + 1] = e > 0 ? w : 0
     macro[k * 4 + 2] = mountain[k]
     macro[k * 4 + 3] = smoothstep(0.5, 0.64, forest[k]) * smoothstep(1, 6, coastDist[k]) * (1 - w) * clear[k]
-    const lake = filled[k] - routed[k] > LAKE_DEPTH
+    const lake = isLake(k)
     flow[k * 4] = lake ? 0 : flowX[k]
     flow[k * 4 + 1] = lake ? 0 : flowY[k]
     flow[k * 4 + 2] = aridity[k]
