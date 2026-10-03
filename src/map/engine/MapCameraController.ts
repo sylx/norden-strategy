@@ -131,6 +131,14 @@ export class MapCameraController {
     // Keep clear of the terrain right under the camera
     const floor = this.groundHeight(cam.position.x, cam.position.z) + 2
     if (cam.position.y < floor) cam.position.y = floor
+    // A fixed 0.5 near plane wastes almost all 24-bit depth precision when
+    // zoomed out, making neighbouring tree cards alternate in front. Move it
+    // with the zoom, but keep it inside the clearance above local terrain.
+    const near = Math.max(0.5, Math.min(this.distance * 0.04, (cam.position.y - floor + 2) * 0.25))
+    if (cam.near !== near) {
+      cam.near = near
+      cam.updateProjectionMatrix()
+    }
     cam.lookAt(this.target)
     cam.updateMatrixWorld()
   }

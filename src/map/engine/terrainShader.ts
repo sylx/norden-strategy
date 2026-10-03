@@ -579,6 +579,7 @@ void main() {
 
   float dist = length(cameraPosition - vWorld);
   color = mix(color, uFogColor, smoothstep(uFogNear, uFogFar, dist));
-  fragColor = vec4(pow(color, vec3(1.0 / 2.2)), 1.0);
+  // Linear in offscreen targets, sRGB on screen, matching the forest material.
+  fragColor = linearToOutputTexel(vec4(color, 1.0));
 }
 `

@@ -21,15 +21,20 @@ void main() {
   float spacing = distance(cameraPosition, vec3(p.x, 0.0, p.y)) / 45.0;
   float h = groundHeight(p, spacing);
   float size = uSize * mix(1.0, 0.65 + aTree.z * 0.7, uVariation);
+  float species = aTree.w < uConifers ? 3.0 : floor(fract(aTree.w * 17.31) * 3.0);
+  vec2 cardUv = uv;
+  // The upper-left oak spills into the upper-right cell through atlas x=646.
+  // Start the beech card at x~705, inside the clear gutter before its leaves
+  // (x=757). Crop the geometry together with the UVs to preserve size/position.
+  if (species == 1.0) cardUv.x = mix(0.12, 1.0, uv.x);
   // Camera-facing cards, like battle's impostors, but continuously follow pitch.
   // The atlas has its trunk bases about 9% above the bottom of each cell.
   vec4 center = viewMatrix * vec4(p.x, h + 0.04, p.y, 1.0);
-  center.xy += vec2(position.x, position.y + 0.41) * size;
+  center.xy += vec2(cardUv.x - 0.5, cardUv.y - 0.09) * size;
   gl_Position = projectionMatrix * center;
-  float species = aTree.w < uConifers ? 3.0 : floor(fract(aTree.w * 17.31) * 3.0);
   vec2 cell = vec2(mod(species, 2.0), 1.0 - floor(species / 2.0));
   // Inset from cell boundaries to prevent neighbouring sprites bleeding in.
-  vUv = (cell + mix(vec2(0.006), vec2(0.994), uv)) * 0.5;
+  vUv = (cell + mix(vec2(0.006), vec2(0.994), cardUv)) * 0.5;
   vTone = mix(1.0, 0.78 + aTree.z * 0.4, uVariation);
   vDistance = length(center.xyz);
 }

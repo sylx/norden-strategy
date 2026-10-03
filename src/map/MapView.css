@@ -39,13 +39,18 @@
   pointer-events: none;
 }
 
-.forest-controls {
+.map-controls {
   position: absolute;
   top: 16px;
   right: 16px;
   width: min(280px, calc(100% - 32px));
   max-height: calc(100% - 64px);
   overflow: auto;
+  display: grid;
+  gap: 8px;
+}
+
+.map-controls__panel {
   color: #e4dfc9;
   background: rgb(20 30 25 / 0.94);
   border: 1px solid #66705a;
@@ -55,17 +60,17 @@
   color-scheme: dark;
 }
 
-.forest-controls summary {
+.map-controls summary {
   padding: 11px 14px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
 }
 
-.forest-controls summary span { float: right; font-size: 11px; color: #afb89c; }
-.forest-controls__body { padding: 0 14px 12px; }
-.forest-controls__mode { display: grid; gap: 5px; }
-.forest-controls select, .forest-controls button {
+.map-controls summary span { float: right; font-size: 11px; color: #afb89c; }
+.map-controls__body { padding: 0 14px 12px; }
+.map-controls__mode { display: grid; gap: 5px; }
+.map-controls select, .map-controls button {
   padding: 6px 8px;
   color: inherit;
   background: #303c31;
@@ -73,20 +78,40 @@
   border-radius: 4px;
   font: inherit;
 }
-.forest-controls button { cursor: pointer; }
-.forest-controls button:hover { background: #465640; }
-.forest-controls__presets { display: flex; gap: 6px; margin: 12px 0; }
-.forest-controls__presets button { flex: 1; }
-.forest-controls fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-.forest-controls fieldset:disabled { opacity: 0.4; }
-.forest-controls__slider { display: block; margin: 9px 0; }
-.forest-controls__slider span { display: flex; justify-content: space-between; gap: 8px; }
-.forest-controls output { font-variant-numeric: tabular-nums; color: #d5c998; }
-.forest-controls input[type='range'] { width: 100%; margin: 5px 0 0; accent-color: #b8c58d; }
-.forest-controls__note { color: #afb89c; font-size: 11px; margin: 10px 0 0; }
-.forest-controls :focus-visible { outline: 2px solid #e4cf89; outline-offset: 3px; }
-.forest-controls__sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.map-controls button { cursor: pointer; }
+.map-controls button:hover { background: #465640; }
+.map-controls__presets { display: flex; gap: 6px; margin: 12px 0; }
+.map-controls__presets button { flex: 1; }
+.map-controls fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.map-controls fieldset:disabled { opacity: 0.4; }
+.map-controls__slider { display: block; margin: 9px 0; }
+.map-controls__slider span { display: flex; justify-content: space-between; gap: 8px; }
+.map-controls output { font-variant-numeric: tabular-nums; color: #d5c998; }
+.map-controls input[type='range'] { width: 100%; margin: 5px 0 0; accent-color: #b8c58d; }
+.map-controls__note { color: #afb89c; font-size: 11px; margin: 10px 0 0; }
+.map-controls :focus-visible { outline: 2px solid #e4cf89; outline-offset: 3px; }
+.map-controls__sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 
 @media (max-width: 600px) {
-  .forest-controls { top: 8px; right: 8px; width: min(240px, calc(100% - 16px)); max-height: 65%; }
+  .map-controls { top: 8px; right: 8px; width: min(240px, calc(100% - 16px)); max-height: 65%; }
+}
+
+.map-controls__toggle { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; }
+.map-controls input[type="checkbox"] { accent-color: #b8c58d; }
+
+.map-controls__export { padding: 10px 14px; }
+.map-controls__export > button { width: 100%; }
+.map-controls__export .map-controls__note { margin-top: 5px; }
+.map-controls__export textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  resize: vertical;
+  background: #17231c;
+  color: #e4dfc9;
+  border: 1px solid #65705b;
+  border-radius: 4px;
+  font: 11px/1.5 ui-monospace, monospace;
 }

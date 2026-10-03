@@ -5,6 +5,8 @@ import { MapCameraController } from './MapCameraController'
 import { TerrainQuadtree } from './TerrainQuadtree'
 import { Forest, type ForestTextureStatus } from './Forest'
 import { normalizeForestSettings, FOREST_DEFAULTS, type ForestSettings } from './forestSettings'
+import { ParchmentEffect } from './ParchmentEffect'
+import { PARCHMENT_DEFAULTS, type ParchmentSettings } from './parchmentSettings'
 
 /** Vertical exaggeration of the macro elevation */
 const HEIGHT_SCALE = 1.4
@@ -27,6 +29,7 @@ export class StrategyMap {
   private readonly scene = new THREE.Scene()
   private readonly terrain: TerrainQuadtree
   private readonly forest: Forest
+  private readonly parchment: ParchmentEffect
   private readonly macro: THREE.DataTexture
   private readonly flow: THREE.DataTexture
   private readonly resizeObserver: ResizeObserver
@@ -37,7 +40,8 @@ export class StrategyMap {
   private fps = 0
   onStats?: (stats: MapStats) => void
 
-  constructor(container: HTMLElement, world: WorldData, forestSettings: ForestSettings = FOREST_DEFAULTS) {
+  constructor(container: HTMLElement, world: WorldData, forestSettings: ForestSettings = FOREST_DEFAULTS,
+    parchmentSettings: ParchmentSettings = PARCHMENT_DEFAULTS) {
     this.container = container
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -65,6 +69,8 @@ export class StrategyMap {
     this.forest = new Forest(world, this.terrain.material, HEIGHT_SCALE, this.renderer.capabilities.getMaxAnisotropy())
     this.forest.applySettings(normalizeForestSettings(forestSettings))
     this.scene.add(this.forest.group)
+    this.parchment = new ParchmentEffect(this.renderer)
+    this.parchment.applySettings(parchmentSettings)
 
     const s = world.worldSize
     this.controls = new MapCameraController(this.camera, this.renderer.domElement, new Heightfield(world), HEIGHT_SCALE, {
@@ -86,6 +92,8 @@ export class StrategyMap {
     const w = Math.max(1, this.container.clientWidth)
     const h = Math.max(1, this.container.clientHeight)
     this.renderer.setSize(w, h)
+    const size = this.renderer.getDrawingBufferSize(new THREE.Vector2())
+    this.parchment.setSize(size.x, size.y, this.renderer.getPixelRatio())
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
   }
@@ -94,13 +102,17 @@ export class StrategyMap {
     this.forest.applySettings(normalizeForestSettings(settings))
   }
 
+  setParchmentSettings(settings: ParchmentSettings) {
+    this.parchment.applySettings(settings)
+  }
+
   private frame = (now: number) => {
     const dt = Math.min(100, now - this.lastTime)
     this.lastTime = now
     this.controls.update(dt)
     this.terrain.update(this.camera)
     this.terrain.material.uniforms.uTime.value = now / 1000
-    this.renderer.render(this.scene, this.camera)
+    this.parchment.render(this.renderer, this.scene, this.camera)
 
     this.frames++
     if (now - this.fpsTime >= 500) {
@@ -118,6 +130,7 @@ export class StrategyMap {
     this.controls.dispose()
     this.terrain.dispose()
     this.forest.dispose()
+    this.parchment.dispose()
     this.macro.dispose()
     this.flow.dispose()
     this.renderer.dispose()
