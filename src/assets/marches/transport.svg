@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 128 128">
+  <!-- Placeholder: covered supply wagon facing right -->
+  <g stroke="#2a1a10" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M22 72 Q22 34 52 32 L78 32 Q104 34 104 72 Z" fill="#efe3c2"/>
+    <path d="M44 33 L40 72 M64 32 L64 72 M84 33 L88 72" fill="none" stroke-width="3.5"/>
+    <rect x="16" y="70" width="94" height="16" rx="3" fill="#8a5a32"/>
+    <path d="M110 78 L122 70" fill="none"/>
+    <circle cx="38" cy="94" r="14" fill="#5a3a20"/>
+    <circle cx="90" cy="94" r="14" fill="#5a3a20"/>
+    <circle cx="38" cy="94" r="3.5" fill="#2a1a10" stroke="none"/>
+    <circle cx="90" cy="94" r="3.5" fill="#2a1a10" stroke="none"/>
+  </g>
+</svg>

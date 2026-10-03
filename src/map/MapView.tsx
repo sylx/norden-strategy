@@ -12,6 +12,7 @@ import { readRenderSettings, saveRenderSettings, type RenderSettings } from './e
 import { PlaceControls } from './PlaceControls'
 import { readPlaceSettings, savePlaceSettings, type PlaceSettings } from './engine/placeSettings'
 import { SettingsExport } from './SettingsExport'
+import { OverlayTestControls } from './OverlayTestControls'
 import { PLACE_POSITIONS, PLACES } from './world/placeLayout'
 import './MapView.css'
 
@@ -25,6 +26,8 @@ declare global {
 export default function MapView() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<StrategyMap | null>(null)
+  const [map, setMap] = useState<StrategyMap | null>(null)
+  const [selectedPlace, setSelectedPlace] = useState('')
   const [forestSettings, setForestSettings] = useState(readForestSettings)
   const forestSettingsRef = useRef(forestSettings)
   const [parchmentSettings, setParchmentSettings] = useState(readParchmentSettings)
@@ -58,6 +61,7 @@ export default function MapView() {
         places: placeSettingsRef.current,
       })
       mapRef.current = map
+      setMap(map)
       map.onStats = setStats
       if (import.meta.env.DEV) window.__strategyMap = map
       setLoading(false)
@@ -69,20 +73,24 @@ export default function MapView() {
       job.cancel()
       map?.dispose()
       mapRef.current = null
+      setMap(null)
       if (window.__strategyMap === map) delete window.__strategyMap
     }
   }, [])
 
-  // Dev only: a click (not a drag) shows the image coordinates for placeLayout.ts
+  // A click (not a drag) selects the city under it; in dev it also shows the image coordinates for placeLayout.ts
   useEffect(() => {
     const container = containerRef.current
-    if (!import.meta.env.DEV || !container) return
+    if (!container) return
     let down: { x: number; y: number } | null = null
     const onDown = (e: PointerEvent) => { down = e.isPrimary ? { x: e.clientX, y: e.clientY } : null }
     const onUp = (e: PointerEvent) => {
       if (!down || !e.isPrimary || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return
       down = null
-      const point = mapRef.current?.pickImagePoint(e.clientX, e.clientY)
+      if (!mapRef.current) return
+      setSelectedPlace(mapRef.current.pickPlace(e.clientX, e.clientY) ?? '')
+      if (!import.meta.env.DEV) return
+      const point = mapRef.current.pickImagePoint(e.clientX, e.clientY)
       if (!point) return
       const text = `[${point[0]}, ${point[1]}]`
       setPicked(`${text}${describeNearest(point)}`)
@@ -139,6 +147,7 @@ export default function MapView() {
       <aside className="map-controls" aria-label="地図の描画設定">
         <SettingsExport forest={forestSettings} parchment={parchmentSettings} terrain={terrainSettings}
           render={renderSettings} places={placeSettings} />
+        <OverlayTestControls map={map} selected={selectedPlace} onSelect={setSelectedPlace} />
         <PlaceControls settings={placeSettings} onChange={changePlaceSettings} warnings={warnings} />
         <RenderControls settings={renderSettings} onChange={changeRenderSettings}
           width={stats?.width} height={stats?.height} fps={stats?.fps} />

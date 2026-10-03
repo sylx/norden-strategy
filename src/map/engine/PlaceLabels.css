@@ -27,6 +27,11 @@
   filter: drop-shadow(0 0 2px #000a);
 }
 
+.place-label--selected {
+  color: #ffe08a;
+  text-shadow: 0 0 2px #000, 0 0 4px #000, 0 0 10px #c8901c;
+}
+
 .place-labels[hidden],
 .place-label[hidden] {
   display: none;

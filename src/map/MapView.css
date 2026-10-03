@@ -79,6 +79,7 @@
   font: inherit;
 }
 .map-controls button { cursor: pointer; }
+.map-controls button:disabled { cursor: default; opacity: 0.45; }
 .map-controls button:hover { background: #465640; }
 .map-controls__presets { display: flex; gap: 6px; margin: 12px 0; }
 .map-controls__presets button { flex: 1; }
@@ -115,3 +116,26 @@
   border-radius: 4px;
   font: 11px/1.5 ui-monospace, monospace;
 }
+
+.map-controls__heading {
+  margin: 14px 0 4px;
+  padding-top: 10px;
+  border-top: 1px solid #3f4a3c;
+  font-size: 12px;
+  color: #d5c998;
+}
+.map-controls__heading:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.map-controls__field { display: grid; gap: 4px; margin: 8px 0; min-width: 0; }
+.map-controls__field select { width: 100%; min-width: 0; }
+.map-controls input[type='text'] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  color: inherit;
+  background: #303c31;
+  border: 1px solid #65705b;
+  border-radius: 4px;
+  font: inherit;
+}
+.map-controls__row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

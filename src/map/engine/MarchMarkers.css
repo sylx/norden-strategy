@@ -1,0 +1,26 @@
+.march-labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.march-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 1px 6px 1px 5px;
+  white-space: nowrap;
+  color: #fff9df;
+  background: rgb(30 20 12 / 0.72);
+  border-left: 3px solid var(--march-color, #c33);
+  border-radius: 2px;
+  font: 700 11px/1.3 "Hiragino Mincho ProN", "Yu Mincho", serif;
+  letter-spacing: 0.04em;
+  user-select: none;
+  will-change: transform;
+}
+
+.march-label[hidden] {
+  display: none;
+}

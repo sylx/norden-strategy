@@ -16,6 +16,11 @@ import { Roads } from './Roads'
 import { Cities } from './Cities'
 import { PlaceLabels } from './PlaceLabels'
 import { normalizePlaceSettings, PLACE_DEFAULTS, type PlaceSettings } from './placeSettings'
+import { OverlayUniforms } from './overlayUniforms'
+import { RoadNetwork } from './roadNetwork'
+import { RoadHighlights, type RoadHighlight } from './RoadHighlights'
+import { CityHighlights, type CityHighlight } from './CityHighlights'
+import { MarchMarkers, type MarchOrder } from './MarchMarkers'
 
 /** Vertical exaggeration of the macro elevation */
 const HEIGHT_SCALE = 1.4
@@ -34,6 +39,11 @@ export interface MapStats {
   height: number
 }
 
+/** A march along the roads through these cities (neighbours on the road network) */
+export interface MarchCommand extends Omit<MarchOrder, 'path'> {
+  route: readonly string[]
+}
+
 export interface MapSettings {
   forest?: ForestSettings
   parchment?: ParchmentSettings
@@ -47,6 +57,7 @@ export class StrategyMap {
   readonly renderer: THREE.WebGLRenderer
   readonly camera: THREE.PerspectiveCamera
   readonly controls: MapCameraController
+  readonly network: RoadNetwork
   private readonly scene = new THREE.Scene()
   /** Drawn after the post-processing, at full resolution whatever the render resolution (cities, emblems) */
   private readonly overlay = new THREE.Scene()
@@ -56,6 +67,11 @@ export class StrategyMap {
   private readonly roads: Roads
   private readonly cities: Cities
   private readonly labels: PlaceLabels
+  private readonly overlayUniforms: OverlayUniforms
+  private readonly roadHighlights: RoadHighlights
+  private readonly cityHighlights: CityHighlights
+  private readonly marches: MarchMarkers
+  private readonly heights: Heightfield
   private readonly parchment: ParchmentEffect
   private readonly macro: THREE.DataTexture
   private readonly flow: THREE.DataTexture
@@ -70,6 +86,7 @@ export class StrategyMap {
   private pxScale = 1
   private viewSize = { width: 1, height: 1 }
   onStats?: (stats: MapStats) => void
+  private readonly arrivalListeners = new Set<(id: string) => void>()
 
   constructor(container: HTMLElement, world: WorldData, settings: MapSettings = {}) {
     this.container = container
@@ -87,6 +104,7 @@ export class StrategyMap {
     for (let k = 0; k < world.macro.length; k += 4) maxElevation = Math.max(maxElevation, world.macro[k])
 
     const heights = new Heightfield(world)
+    this.heights = heights
     const maxHeight = (maxElevation + 9) * HEIGHT_SCALE
     this.terrain = new TerrainQuadtree({
       world,
@@ -111,6 +129,14 @@ export class StrategyMap {
       this.renderer.capabilities.getMaxAnisotropy())
     this.overlay.add(this.cities.group)
     this.labels = new PlaceLabels(container, PLACES, heights, HEIGHT_SCALE)
+    this.network = new RoadNetwork(world.roads)
+    this.overlayUniforms = new OverlayUniforms(this.terrain.material)
+    this.roadHighlights = new RoadHighlights(this.network, this.overlayUniforms)
+    this.cityHighlights = new CityHighlights(PLACES, this.overlayUniforms)
+    this.marches = new MarchMarkers(container, this.overlayUniforms, heights, HEIGHT_SCALE,
+      this.renderer.capabilities.getMaxAnisotropy())
+    this.marches.onArrive = (id) => { for (const listener of this.arrivalListeners) listener(id) }
+    this.overlay.add(this.roadHighlights.group, this.cityHighlights.group, this.marches.group)
     this.setPlaceSettings(settings.places ?? PLACE_DEFAULTS)
     this.parchment = new ParchmentEffect(this.renderer)
     this.parchment.applySettings(settings.parchment ?? PARCHMENT_DEFAULTS)
@@ -145,6 +171,7 @@ export class StrategyMap {
     this.pxScale = h / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2))
     this.roads.setPixelScale(this.pxScale)
     this.cities.setPixelScale(this.pxScale)
+    this.overlayUniforms.setPixelScale(this.pxScale)
   }
 
   setForestSettings(settings: ForestSettings) {
@@ -176,7 +203,69 @@ export class StrategyMap {
     const settings = normalizePlaceSettings(value)
     this.roads.applySettings(settings)
     this.cities.applySettings(settings)
+    this.cityHighlights.applySettings(settings)
     this.labels.applySettings(settings)
+  }
+
+  /** Selection rings under these cities (and their names drawn as selected) */
+  setCityHighlights(highlights: readonly CityHighlight[]) {
+    this.cityHighlights.set(highlights)
+    this.labels.setHighlighted(new Set(highlights.map((h) => h.id)))
+  }
+
+  /** Highlighted roads between neighbouring cities. Returns those not on the road network. */
+  setRoadHighlights(highlights: readonly RoadHighlight[]): RoadHighlight[] {
+    return this.roadHighlights.set(highlights)
+  }
+
+  /** Starts a march along a route of neighbouring cities; false when the roads do not join them */
+  march(command: MarchCommand): boolean {
+    const { route, ...order } = command
+    const path = this.network.routePath(route)
+    if (!path) return false
+    this.marches.march({ ...order, path })
+    return true
+  }
+
+  stopMarch(id: string) {
+    this.marches.remove(id)
+  }
+
+  clearMarches() {
+    this.marches.clear()
+  }
+
+  /** Calls the listener when a march reaches its goal; returns the unsubscribe function */
+  onMarchArrive(listener: (id: string) => void): () => void {
+    this.arrivalListeners.add(listener)
+    return () => { this.arrivalListeners.delete(listener) }
+  }
+
+  get marchCount() {
+    return this.marches.count
+  }
+
+  /** The city whose card or emblem is nearest to a client position, within maxPx of its ground point */
+  pickPlace(clientX: number, clientY: number, maxPx = 36): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const p = new THREE.Vector3()
+    let best: string | null = null
+    let bestD = maxPx
+    for (const place of PLACES) {
+      p.set(place.x, this.heights.surfaceAt(place.x, place.z) * HEIGHT_SCALE, place.z).project(this.camera)
+      if (p.z > 1) continue
+      const x = rect.left + (p.x * 0.5 + 0.5) * rect.width
+      const y = rect.top + (0.5 - p.y * 0.5) * rect.height
+      const d = Math.hypot(x - clientX, y - clientY)
+      if (d < bestD) { bestD = d; best = place.id }
+    }
+    return best
+  }
+
+  /** Moves the camera over a city, keeping the zoom */
+  focusPlace(id: string) {
+    const place = PLACES.find((p) => p.id === id)
+    if (place) this.controls.setView(place.x, place.z, this.controls.getView().distance)
   }
 
   setParchmentSettings(settings: ParchmentSettings) {
@@ -189,8 +278,13 @@ export class StrategyMap {
     this.controls.update(dt)
     this.terrain.update(this.camera)
     this.terrain.material.uniforms.uTime.value = now / 1000
-    const art = this.cities.update(this.controls.getView().distance)
+    const viewDistance = this.controls.getView().distance
+    const art = this.cities.update(viewDistance)
     this.labels.update(this.camera, this.viewSize.width, this.viewSize.height, this.pxScale, art)
+    this.overlayUniforms.update(viewDistance)
+    this.roadHighlights.update(dt)
+    this.cityHighlights.update(dt, art)
+    this.marches.update(dt, this.camera, this.viewSize.width, this.viewSize.height, this.pxScale)
     this.parchment.render(this.renderer, this.scene, this.camera)
     this.renderer.autoClear = false
     this.renderer.render(this.overlay, this.camera)
@@ -218,6 +312,9 @@ export class StrategyMap {
     this.roads.dispose()
     this.cities.dispose()
     this.labels.dispose()
+    this.roadHighlights.dispose()
+    this.cityHighlights.dispose()
+    this.marches.dispose()
     this.parchment.dispose()
     this.macro.dispose()
     this.flow.dispose()

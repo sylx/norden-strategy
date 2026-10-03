@@ -47,6 +47,11 @@ export class PlaceLabels {
     this.layer.style.setProperty('--place-label-emblem', `${settings.labelEmblemPx}px`)
   }
 
+  /** Labels of these cities are drawn as selected */
+  setHighlighted(ids: ReadonlySet<string>) {
+    for (const label of this.labels) label.element.classList.toggle('place-label--selected', ids.has(label.place.id))
+  }
+
   /**
    * pxScale: CSS px per world unit at view depth 1; art: visibility of the
    * city art against the emblems (Cities.update)
