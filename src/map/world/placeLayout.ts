@@ -36,7 +36,7 @@ export const PLACE_POSITIONS: Readonly<Record<string, Vec2>> = {
   P021: [4031, 1494],
   P022: [7150, 3826],
   P023: [3917, 4130],
-  P024 :[5979, 3366],
+  P024: [5985, 3548],
   P025: [4333, 3391],
   P026: [2110, 3821],
   P027: [5412, 2060],
@@ -47,14 +47,14 @@ export const PLACE_POSITIONS: Readonly<Record<string, Vec2>> = {
 
 /** Pairs of cities joined by a road. The route itself is searched over the terrain. */
 export const ROAD_LINKS: readonly (readonly [string, string])[] = [
-  ['P000', 'P013'], ['P000', 'P018'], ['P001', 'P002'], ['P002', 'P003'], ['P002', 'P004'],
-  ['P002', 'P030'], ['P003', 'P005'], ['P003', 'P006'], ['P003', 'P008'], ['P004', 'P005'],
+  ['P000', 'P013'], ['P000', 'P018'], ['P001', 'P002'],['P001', 'P030'],['P002', 'P003'], ['P002', 'P004'],
+  ['P002', 'P030'], ['P003', 'P005'], ['P003', 'P008'], ['P004', 'P005'],
   ['P004', 'P012'], ['P005', 'P010'], ['P006', 'P007'], ['P007', 'P008'], ['P008', 'P009'],
   ['P008', 'P011'], ['P009', 'P011'], ['P009', 'P022'], ['P010', 'P011'], ['P010', 'P023'],
-  ['P011', 'P024'], ['P012', 'P026'], ['P013', 'P025'], ['P013', 'P028'], ['P014', 'P026'],
+  ['P011', 'P024'], ['P012', 'P026'], ['P013', 'P025'], ['P013', 'P028'], ['P021', 'P029'],['P014', 'P026'],
   ['P014', 'P015'], ['P015', 'P026'], ['P015', 'P023'], ['P016', 'P028'], ['P017', 'P019'],
-  ['P018', 'P024'], ['P018', 'P027'], ['P019', 'P027'], ['P020', 'P027'], ['P023', 'P025'],
-  ['P022', 'P024'], ['P021', 'P028'], ['P027', 'P029'], ['P028', 'P029'],
+  ['P018', 'P024'], ['P018', 'P017'],['P018', 'P027'], ['P019', 'P020'], ['P020', 'P027'], ['P023', 'P025'],
+  ['P022', 'P024'], ['P021', 'P028'], ['P027', 'P029'],
 ]
 
 /**
@@ -65,7 +65,7 @@ export const ROAD_LINKS: readonly (readonly [string, string])[] = [
 export const PLACE_KINDS: Readonly<Record<PlaceType, { size: number; radius: number }>> = {
   town: { size: 1, radius: 5 },
   city: { size: 1.54, radius: 6.5 },
-  metropolice: { size: 3.59, radius: 11 },
+  metropolice: { size: 2.59, radius: 11 },
   fortress1: { size: 1.34, radius: 6 },
   fortress2: { size: 1.21, radius: 5.5 },
   temple: { size: 2, radius: 8 },

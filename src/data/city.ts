@@ -119,7 +119,7 @@ export const CITY_LIST: City[] = [
     "nameEn": "Tirna",
     "type": "ruin_city",
     "tags": ["遺跡", "ゴーレム", "禁忌"],
-    "population": 5000,
+    "population": 10000,
     "agriculture": 140,
     "market": 160,
     "military": 140,
