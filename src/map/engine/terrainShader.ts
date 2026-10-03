@@ -8,12 +8,15 @@
  * revealing finer coastlines, rock faces, tree crowns, dunes and ripples.
  */
 
-const common = /* glsl */ `
+export const terrainCommon = /* glsl */ `
 uniform sampler2D uMacro;
 uniform sampler2D uFlow;
 uniform float uWorldSize;
 uniform float uHeightScale;
 uniform float uTime;
+uniform float uTexturedForest;
+uniform float uForestDensity;
+uniform float uForestShade;
 
 // --- hashing -----------------------------------------------------------------
 uint pcg(uint v) {
@@ -274,10 +277,24 @@ vec3 dunes(vec2 p, float spacing) {
   if (v3 > 0.0) d += duneLayer(p, 0.25, 0.9, 0.3, 9.1) * 0.012 * v3;
   return d;
 }
+
+// Shared with tree cards, keeping their roots on the displaced terrain.
+float groundHeight(vec2 p, float spacing) {
+  vec4 m = macroAt(p);
+  float desert = desertMask(flowAt(p).b, p);
+  float h = m.r;
+  if (m.r > -8.0) h += detail(p, octavesFor(spacing), m.b).x * detailAmp(m, desert);
+  float y = max(h, 0.0);
+  if (h > 0.0) {
+    if (uTexturedForest < 0.5) y += canopy(p, forestMask(m, p), spacing).h;
+    if (desert > 0.0) y += dunes(p, spacing).x * desert;
+  }
+  return y * uHeightScale;
+}
 `
 
 export const terrainVertexShader = /* glsl */ `
-${common}
+${terrainCommon}
 in vec4 aTile; // x0, z0, size, vertex spacing
 out vec3 vWorld;
 
@@ -287,25 +304,16 @@ void main() {
   // neighbouring tiles of different size agree along their shared edge.
   // 45 ~ distance / vertex spacing at which the quadtree picks a tile.
   float spacing = max(distance(cameraPosition, vec3(p.x, 0.0, p.y)) / 45.0, aTile.w * 0.5);
-  vec4 m = macroAt(p);
-  float desert = desertMask(flowAt(p).b, p);
-  float h = m.r;
-  if (m.r > -8.0) h += detail(p, octavesFor(spacing), m.b).x * detailAmp(m, desert);
-  // Sea is a flat surface
-  float y = max(h, 0.0);
-  if (h > 0.0) {
-    y += canopy(p, forestMask(m, p), spacing).h;
-    if (desert > 0.0) y += dunes(p, spacing).x * desert;
-  }
+  float y = groundHeight(p, spacing);
   // Skirts (position.y = 1) hang below the tile to hide cracks
-  y = y * uHeightScale - position.y * max(spacing * 3.0, 0.5);
+  y -= position.y * max(spacing * 3.0, 0.5);
   vWorld = vec3(p.x, y, p.y);
   gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
 }
 `
 
 export const terrainFragmentShader = /* glsl */ `
-${common}
+${terrainCommon}
 uniform vec3 uSunDir;
 uniform vec3 uFogColor;
 uniform float uFogNear;
@@ -496,7 +504,14 @@ void main() {
     // Forest canopy
     vec2 forest = forestMask(m, p);
     float fm = forest.x;
-    if (fm > 0.0) {
+    if (fm > 0.0 && uTexturedForest > 0.5) {
+      // Flat, mottled understory; the cutout cards supply the crown silhouettes.
+      float mottling = noised(p * 0.8).x * 0.5 + 0.5;
+      vec3 floorColor = mix(srgb(47.0, 68.0, 30.0), srgb(67.0, 91.0, 39.0), mottling);
+      floorColor *= mix(1.3, 0.65, uForestShade);
+      albedo = mix(albedo, floorColor, fm * sqrt(uForestDensity) * 0.88);
+    }
+    if (fm > 0.0 && uTexturedForest < 0.5) {
       Canopy c = canopy(p, forest, footprint);
       vec3 dark = srgb(30.0, 70.0, 30.0);
       vec3 mid = srgb(50.0, 102.0, 36.0);
@@ -518,7 +533,7 @@ void main() {
     }
     // Lone trees dotting open country, once they span a few pixels
     float treeVis = smoothstep(0.12, 0.05, footprint) * (1.0 - fm);
-    if (treeVis > 0.0) {
+    if (treeVis > 0.0 && uTexturedForest < 0.5) {
       float loose = (0.04 + smoothstep(0.15, 0.38, m.a) * 0.2)
         * (1.0 - rockiness) * (1.0 - desert) * (1.0 - snow);
       const float LONE_FREQ = 1.3;
@@ -534,7 +549,7 @@ void main() {
 
     // Shade cast by woods onto open ground beside them
     float woodShadow = clamp(dot(forestGrad, L.xz) * 2.5, 0.0, 1.0) * (1.0 - smoothstep(0.0, 0.3, fm));
-    albedo *= 1.0 - woodShadow * 0.35;
+    albedo *= 1.0 - woodShadow * mix(0.35, uForestShade * uForestDensity * 0.5, uTexturedForest);
 
     // Beaches
     float beachN = noised(p * 2.0).x * 0.05;

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { StrategyMap, type MapStats } from './engine/StrategyMap'
 import { loadWorld } from './world/loadWorld'
+import { ForestControls } from './ForestControls'
+import { readForestSettings, saveForestSettings, type ForestSettings } from './engine/forestSettings'
 import './MapView.css'
 
 declare global {
@@ -12,6 +14,9 @@ declare global {
 
 export default function MapView() {
   const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<StrategyMap | null>(null)
+  const [forestSettings, setForestSettings] = useState(readForestSettings)
+  const forestSettingsRef = useRef(forestSettings)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<MapStats | null>(null)
 
@@ -23,7 +28,8 @@ export default function MapView() {
     const job = loadWorld()
     job.promise.then((world) => {
       if (cancelled) return
-      map = new StrategyMap(container, world)
+      map = new StrategyMap(container, world, forestSettingsRef.current)
+      mapRef.current = map
       map.onStats = setStats
       if (import.meta.env.DEV) window.__strategyMap = map
       setLoading(false)
@@ -34,17 +40,26 @@ export default function MapView() {
       cancelled = true
       job.cancel()
       map?.dispose()
+      mapRef.current = null
       if (window.__strategyMap === map) delete window.__strategyMap
     }
   }, [])
+
+  const changeForestSettings = (settings: ForestSettings) => {
+    forestSettingsRef.current = settings
+    setForestSettings(settings)
+    mapRef.current?.setForestSettings(settings)
+    saveForestSettings(settings)
+  }
 
   return (
     <div className="map-view">
       <div ref={containerRef} className="map-view__canvas" />
       {loading && <div className="map-view__loading">地図を生成中…</div>}
+      <ForestControls settings={forestSettings} onChange={changeForestSettings} textureStatus={stats?.forestTexture} />
       {import.meta.env.DEV && stats && (
         <div className="map-view__stats">
-          {stats.fps.toFixed(0)} fps / {stats.tiles} tiles / dist {stats.distance.toFixed(0)}
+          {stats.fps.toFixed(0)} fps / {stats.tiles} tiles / {stats.trees.toLocaleString()} trees / dist {stats.distance.toFixed(0)}
         </div>
       )}
     </div>

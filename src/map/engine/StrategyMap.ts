@@ -3,6 +3,8 @@ import type { WorldData } from '../world/generateWorld'
 import { Heightfield } from '../world/Heightfield'
 import { MapCameraController } from './MapCameraController'
 import { TerrainQuadtree } from './TerrainQuadtree'
+import { Forest, type ForestTextureStatus } from './Forest'
+import { normalizeForestSettings, FOREST_DEFAULTS, type ForestSettings } from './forestSettings'
 
 /** Vertical exaggeration of the macro elevation */
 const HEIGHT_SCALE = 1.4
@@ -13,6 +15,8 @@ export interface MapStats {
   fps: number
   tiles: number
   distance: number
+  trees: number
+  forestTexture: ForestTextureStatus
 }
 
 /** Owns the three.js scene of the strategy map */
@@ -22,6 +26,7 @@ export class StrategyMap {
   readonly controls: MapCameraController
   private readonly scene = new THREE.Scene()
   private readonly terrain: TerrainQuadtree
+  private readonly forest: Forest
   private readonly macro: THREE.DataTexture
   private readonly flow: THREE.DataTexture
   private readonly resizeObserver: ResizeObserver
@@ -32,7 +37,7 @@ export class StrategyMap {
   private fps = 0
   onStats?: (stats: MapStats) => void
 
-  constructor(container: HTMLElement, world: WorldData) {
+  constructor(container: HTMLElement, world: WorldData, forestSettings: ForestSettings = FOREST_DEFAULTS) {
     this.container = container
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -57,6 +62,9 @@ export class StrategyMap {
       maxHeight: (maxElevation + 9) * HEIGHT_SCALE,
     })
     this.scene.add(this.terrain.mesh)
+    this.forest = new Forest(world, this.terrain.material, HEIGHT_SCALE, this.renderer.capabilities.getMaxAnisotropy())
+    this.forest.applySettings(normalizeForestSettings(forestSettings))
+    this.scene.add(this.forest.group)
 
     const s = world.worldSize
     this.controls = new MapCameraController(this.camera, this.renderer.domElement, new Heightfield(world), HEIGHT_SCALE, {
@@ -82,6 +90,10 @@ export class StrategyMap {
     this.camera.updateProjectionMatrix()
   }
 
+  setForestSettings(settings: ForestSettings) {
+    this.forest.applySettings(normalizeForestSettings(settings))
+  }
+
   private frame = (now: number) => {
     const dt = Math.min(100, now - this.lastTime)
     this.lastTime = now
@@ -95,7 +107,8 @@ export class StrategyMap {
       this.fps = (this.frames * 1000) / (now - this.fpsTime)
       this.frames = 0
       this.fpsTime = now
-      this.onStats?.({ fps: this.fps, tiles: this.terrain.tileCount, distance: this.controls.getView().distance })
+      this.onStats?.({ fps: this.fps, tiles: this.terrain.tileCount, distance: this.controls.getView().distance,
+        trees: this.forest.count, forestTexture: this.forest.status })
     }
   }
 
@@ -104,6 +117,7 @@ export class StrategyMap {
     this.resizeObserver.disconnect()
     this.controls.dispose()
     this.terrain.dispose()
+    this.forest.dispose()
     this.macro.dispose()
     this.flow.dispose()
     this.renderer.dispose()
