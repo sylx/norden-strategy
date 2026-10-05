@@ -232,6 +232,19 @@ export class Cities {
     this.shared.uPxScale.value = scale
   }
 
+  /**
+   * On-screen size (CSS px) of a place's card or emblem at a view depth, as
+   * currently drawn (crossfade included), and how far (CSS px) its centre sits
+   * above the place's ground point.
+   */
+  screenSize(place: Place, depth: number): { size: number; lift: number } {
+    const card = cardPixels(place.type, depth, this.shared.uPxScale.value, this.settings)
+    const cardLift = (0.5 - PLACE_ART[place.type].anchor[1]) * card
+    if (!emblemUrl(place.belongTo)) return { size: card, lift: cardLift }
+    const art = this.artAlpha.value
+    return { size: THREE.MathUtils.lerp(this.settings.emblemPx, card, art), lift: cardLift * art }
+  }
+
   dispose() {
     this.geometry.dispose()
     for (const material of this.materials) material.dispose()

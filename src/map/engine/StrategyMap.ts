@@ -27,6 +27,8 @@ import { MarchMarkers, type MarchOrder } from './MarchMarkers'
 const HEIGHT_SCALE = 1.4
 /** Root tile size: the map plus a wide band of open sea */
 const TERRAIN_EXTENT = 4096
+/** Hit radius of a city against the on-screen size of its card or emblem */
+const PICK_RADIUS = 0.4
 
 export interface MapStats {
   fps: number
@@ -249,19 +251,28 @@ export class StrategyMap {
     return this.marches.count
   }
 
-  /** The city whose card or emblem is nearest to a client position, within maxPx of its ground point */
-  pickPlace(clientX: number, clientY: number, maxPx = 36): string | null {
+  /**
+   * The city whose card or emblem is nearest to a client position. Each one
+   * is hit within a circle around its drawn centre that follows its on-screen
+   * size, and never smaller than minPx in radius.
+   */
+  pickPlace(clientX: number, clientY: number, minPx = 36): string | null {
     const rect = this.renderer.domElement.getBoundingClientRect()
     const p = new THREE.Vector3()
     let best: string | null = null
-    let bestD = maxPx
+    let bestD = Infinity
     for (const place of PLACES) {
-      p.set(place.x, this.heights.surfaceAt(place.x, place.z) * HEIGHT_SCALE, place.z).project(this.camera)
-      if (p.z > 1) continue
+      p.set(place.x, this.heights.surfaceAt(place.x, place.z) * HEIGHT_SCALE, place.z)
+      const depth = -p.clone().applyMatrix4(this.camera.matrixWorldInverse).z
+      if (depth <= 0) continue
+      p.project(this.camera)
+      const { size, lift } = this.cities.screenSize(place, depth)
+      // The drawn art fills a little less than its square card
+      const radius = Math.max(minPx, size * PICK_RADIUS)
       const x = rect.left + (p.x * 0.5 + 0.5) * rect.width
-      const y = rect.top + (0.5 - p.y * 0.5) * rect.height
+      const y = rect.top + (0.5 - p.y * 0.5) * rect.height - lift
       const d = Math.hypot(x - clientX, y - clientY)
-      if (d < bestD) { bestD = d; best = place.id }
+      if (d < radius && d < bestD) { bestD = d; best = place.id }
     }
     return best
   }
