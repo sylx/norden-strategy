@@ -109,15 +109,16 @@ export interface RibbonStyle {
 }
 
 /**
- * A ribbon of constant on-screen width along a route, draped on the terrain.
- * Meant for the overlay scene: it is drawn over hills and trees.
+ * A ribbon of constant on-screen width along a route (or several, in one
+ * draw call), draped on the terrain. Meant for the overlay scene: it is drawn
+ * over hills and trees.
  */
 export class RouteRibbon {
   readonly mesh: THREE.Mesh
   private readonly geometry = new THREE.BufferGeometry()
   private readonly material: THREE.ShaderMaterial
 
-  constructor(path: Polyline, overlay: OverlayUniforms, style: RibbonStyle) {
+  constructor(paths: Polyline | readonly Polyline[], overlay: OverlayUniforms, style: RibbonStyle) {
     this.material = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3, vertexShader, fragmentShader,
       transparent: true, depthTest: false, depthWrite: false,
@@ -134,34 +135,40 @@ export class RouteRibbon {
       },
     })
 
-    const pts = path.points
-    const n = pts.length / 2
-    const centers = new Float32Array(n * 4)
-    const dirs = new Float32Array(n * 4)
-    const sides = new Float32Array(n * 4)
+    const list = Array.isArray(paths) ? paths : [paths as Polyline]
+    const total = list.reduce((sum, path) => sum + path.points.length / 2, 0)
+    const centers = new Float32Array(total * 4)
+    const dirs = new Float32Array(total * 4)
+    const sides = new Float32Array(total * 4)
     const index: number[] = []
-    for (let i = 0; i < n; i++) {
-      const prev = Math.max(0, i - 1)
-      const next = Math.min(n - 1, i + 1)
-      const dx = pts[next * 2] - pts[prev * 2]
-      const dz = pts[next * 2 + 1] - pts[prev * 2 + 1]
-      const len = Math.hypot(dx, dz) || 1
-      for (let s = 0; s < 2; s++) {
-        const k = (i * 2 + s) * 2
-        centers[k] = pts[i * 2]
-        centers[k + 1] = pts[i * 2 + 1]
-        dirs[k] = dx / len
-        dirs[k + 1] = dz / len
-        sides[k] = s === 0 ? -1 : 1
-        sides[k + 1] = path.distances[i]
+    let base = 0
+    for (const path of list) {
+      const pts = path.points
+      const n = pts.length / 2
+      for (let i = 0; i < n; i++) {
+        const prev = Math.max(0, i - 1)
+        const next = Math.min(n - 1, i + 1)
+        const dx = pts[next * 2] - pts[prev * 2]
+        const dz = pts[next * 2 + 1] - pts[prev * 2 + 1]
+        const len = Math.hypot(dx, dz) || 1
+        for (let s = 0; s < 2; s++) {
+          const k = ((base + i) * 2 + s) * 2
+          centers[k] = pts[i * 2]
+          centers[k + 1] = pts[i * 2 + 1]
+          dirs[k] = dx / len
+          dirs[k + 1] = dz / len
+          sides[k] = s === 0 ? -1 : 1
+          sides[k + 1] = path.distances[i]
+        }
+        if (i > 0) {
+          const a = (base + i - 1) * 2
+          index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2)
+        }
       }
-      if (i > 0) {
-        const a = (i - 1) * 2
-        index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2)
-      }
+      base += n
     }
     // The vertex shader builds the positions; this attribute only sets the count
-    this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(n * 2 * 3), 3))
+    this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(total * 2 * 3), 3))
     this.geometry.setAttribute('aCenter', new THREE.Float32BufferAttribute(centers, 2))
     this.geometry.setAttribute('aDir', new THREE.Float32BufferAttribute(dirs, 2))
     this.geometry.setAttribute('aSide', new THREE.Float32BufferAttribute(sides, 2))

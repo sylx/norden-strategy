@@ -13,12 +13,14 @@ export interface PlaceSettings {
   roadWidth: number
   /** Narrowest on-screen road width (CSS px) */
   roadMinPx: number
+  /** Opacity of the road lines drawn over the map while the cities are emblems (0 = off) */
+  roadOverview: number
   labels: boolean
 }
 
 export const PLACE_DEFAULTS: PlaceSettings = {
   citySize: 19, cityMinPx: 10, cityMaxPx: 240, emblemSwitchPx: 34, emblemPx: 60, labelEmblemPx: 52,
-  roadWidth: 3, roadMinPx: 3, labels: true,
+  roadWidth: 3, roadMinPx: 3, roadOverview: 0.8, labels: true,
 }
 
 export const PLACE_SLIDERS = [
@@ -30,6 +32,7 @@ export const PLACE_SLIDERS = [
   { key: 'labelEmblemPx', label: '都市表示時の紋章の大きさ（px）', min: 8, max: 64, step: 1, digits: 0 },
   { key: 'roadWidth', label: '街道の幅', min: 0.3, max: 4, step: 0.1, digits: 1 },
   { key: 'roadMinPx', label: '街道の最小幅（px）', min: 1, max: 6, step: 0.1, digits: 1 },
+  { key: 'roadOverview', label: '紋章表示時の街道の強調', min: 0, max: 1, step: 0.05, digits: 2 },
 ] as const
 
 const STORAGE_KEY = 'norden-strategy.places.v1'

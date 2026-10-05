@@ -19,6 +19,7 @@ import { normalizePlaceSettings, PLACE_DEFAULTS, type PlaceSettings } from './pl
 import { OverlayUniforms } from './overlayUniforms'
 import { RoadNetwork } from './roadNetwork'
 import { RoadHighlights, type RoadHighlight } from './RoadHighlights'
+import { RoadOverview } from './RoadOverview'
 import { CityHighlights, type CityHighlight } from './CityHighlights'
 import { MarchMarkers, type MarchOrder } from './MarchMarkers'
 
@@ -68,6 +69,7 @@ export class StrategyMap {
   private readonly cities: Cities
   private readonly labels: PlaceLabels
   private readonly overlayUniforms: OverlayUniforms
+  private readonly roadOverview: RoadOverview
   private readonly roadHighlights: RoadHighlights
   private readonly cityHighlights: CityHighlights
   private readonly marches: MarchMarkers
@@ -131,12 +133,13 @@ export class StrategyMap {
     this.labels = new PlaceLabels(container, PLACES, heights, HEIGHT_SCALE)
     this.network = new RoadNetwork(world.roads)
     this.overlayUniforms = new OverlayUniforms(this.terrain.material)
+    this.roadOverview = new RoadOverview(world.roads, this.overlayUniforms)
     this.roadHighlights = new RoadHighlights(this.network, this.overlayUniforms)
     this.cityHighlights = new CityHighlights(PLACES, this.overlayUniforms)
     this.marches = new MarchMarkers(container, this.overlayUniforms, heights, HEIGHT_SCALE,
       this.renderer.capabilities.getMaxAnisotropy())
     this.marches.onArrive = (id) => { for (const listener of this.arrivalListeners) listener(id) }
-    this.overlay.add(this.roadHighlights.group, this.cityHighlights.group, this.marches.group)
+    this.overlay.add(this.roadOverview.mesh, this.roadHighlights.group, this.cityHighlights.group, this.marches.group)
     this.setPlaceSettings(settings.places ?? PLACE_DEFAULTS)
     this.parchment = new ParchmentEffect(this.renderer)
     this.parchment.applySettings(settings.parchment ?? PARCHMENT_DEFAULTS)
@@ -202,6 +205,7 @@ export class StrategyMap {
   setPlaceSettings(value: PlaceSettings) {
     const settings = normalizePlaceSettings(value)
     this.roads.applySettings(settings)
+    this.roadOverview.setStrength(settings.roadOverview)
     this.cities.applySettings(settings)
     this.cityHighlights.applySettings(settings)
     this.labels.applySettings(settings)
@@ -284,6 +288,7 @@ export class StrategyMap {
     const art = this.cities.update(viewDistance)
     this.labels.update(this.camera, this.viewSize.width, this.viewSize.height, this.pxScale, art)
     this.overlayUniforms.update(viewDistance)
+    this.roadOverview.update(art)
     this.roadHighlights.update(dt)
     this.cityHighlights.update(dt, art)
     this.marches.update(dt, this.camera, this.viewSize.width, this.viewSize.height, this.pxScale)
@@ -314,6 +319,7 @@ export class StrategyMap {
     this.roads.dispose()
     this.cities.dispose()
     this.labels.dispose()
+    this.roadOverview.dispose()
     this.roadHighlights.dispose()
     this.cityHighlights.dispose()
     this.marches.dispose()
