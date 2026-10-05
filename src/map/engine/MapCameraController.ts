@@ -15,6 +15,8 @@ export interface CameraLimits {
 const ZOOM_TAU_MS = 90
 /** Time constant (ms) of the height following of the look-at point */
 const HEIGHT_TAU_MS = 160
+/** Time constant (ms) of the glide started by panTo */
+const PAN_TAU_MS = 180
 const WHEEL_SENSITIVITY = 0.0015
 /** Velocity decay (per second) of the pan inertia after releasing a drag */
 const INERTIA_DAMPING = 6
@@ -40,6 +42,8 @@ export class MapCameraController {
   private readonly pointers = new Map<number, THREE.Vector2>()
   private pinchDistance = 0
   private readonly velocity = new THREE.Vector2()
+  /** Look-at point a panTo glide is heading for; a drag or zoom cancels it */
+  private panGoal: THREE.Vector2 | null = null
   private lastDragTime = 0
 
   private readonly raycaster = new THREE.Raycaster()
@@ -73,9 +77,18 @@ export class MapCameraController {
     this.target.set(x, this.groundHeight(x, z), z)
     this.distance = this.targetDistance = this.clampDistance(distance)
     this.zoomAnchor = null
+    this.panGoal = null
     this.velocity.set(0, 0)
     this.clampTarget()
     this.applyCamera()
+  }
+
+  /** Glide the look-at point to x/z, keeping the zoom */
+  panTo(x: number, z: number) {
+    const b = this.limits.bounds
+    this.panGoal = new THREE.Vector2(THREE.MathUtils.clamp(x, b.minX, b.maxX), THREE.MathUtils.clamp(z, b.minZ, b.maxZ))
+    this.zoomAnchor = null
+    this.velocity.set(0, 0)
   }
 
   getView() {
@@ -97,6 +110,18 @@ export class MapCameraController {
       this.target.x += this.velocity.x * dt
       this.target.z += this.velocity.y * dt
       this.velocity.multiplyScalar(Math.exp(-INERTIA_DAMPING * dt))
+    }
+
+    // panTo glide
+    if (this.panGoal) {
+      const kp = 1 - Math.exp(-dtMs / PAN_TAU_MS)
+      this.target.x += (this.panGoal.x - this.target.x) * kp
+      this.target.z += (this.panGoal.y - this.target.z) * kp
+      if (Math.hypot(this.panGoal.x - this.target.x, this.panGoal.y - this.target.z) < this.distance * 1e-4) {
+        this.target.x = this.panGoal.x
+        this.target.z = this.panGoal.y
+        this.panGoal = null
+      }
     }
 
     // Follow the terrain smoothly so the camera never dips into mountains
@@ -202,6 +227,7 @@ export class MapCameraController {
     this.pointers.set(e.pointerId, new THREE.Vector2(e.clientX, e.clientY))
     this.velocity.set(0, 0)
     this.zoomAnchor = null
+    this.panGoal = null
     if (this.pointers.size === 1) {
       const world = this.pickGround(this.toNdc(e.clientX, e.clientY, this.tmpNdc))
       this.drag = world ? { pointerId: e.pointerId, world } : null
@@ -271,6 +297,7 @@ export class MapCameraController {
     const ndc = this.toNdc(clientX, clientY, new THREE.Vector2())
     const world = this.pickGround(ndc)
     this.zoomAnchor = world ? { world, ndc } : null
+    this.panGoal = null
     this.velocity.set(0, 0)
   }
 

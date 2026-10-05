@@ -262,10 +262,12 @@ export class StrategyMap {
     return best
   }
 
-  /** Moves the camera over a city, keeping the zoom */
-  focusPlace(id: string) {
+  /** Moves the camera over a city, keeping the zoom; glides there unless `instant` */
+  focusPlace(id: string, instant = false) {
     const place = PLACES.find((p) => p.id === id)
-    if (place) this.controls.setView(place.x, place.z, this.controls.getView().distance)
+    if (!place) return
+    if (instant) this.controls.setView(place.x, place.z, this.controls.getView().distance)
+    else this.controls.panTo(place.x, place.z)
   }
 
   setParchmentSettings(settings: ParchmentSettings) {

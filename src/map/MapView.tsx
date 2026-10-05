@@ -24,7 +24,7 @@ declare global {
 }
 
 export interface MapViewProps {
-  /** Selected city id ('' for none). Omit to let the view keep its own selection */
+  /** Selected city id ('' for none); the camera glides to it when it changes. Omit to let the view keep its own selection */
   selectedPlace?: string
   /** A click on the map selected a city ('' for a click on empty ground) */
   onSelectPlace?: (id: string) => void
@@ -97,6 +97,11 @@ export default function MapView({ selectedPlace: selectedProp, onSelectPlace, sh
       if (window.__strategyMap === map) delete window.__strategyMap
     }
   }, [])
+
+  // Bring the selected city to the centre of the view
+  useEffect(() => {
+    if (map && selectedPlace) map.focusPlace(selectedPlace)
+  }, [map, selectedPlace])
 
   // A click (not a drag) selects the city under it; in dev it also shows the image coordinates for placeLayout.ts
   useEffect(() => {
