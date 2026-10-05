@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { StrategyMap, type MapStats } from './engine/StrategyMap'
 import { loadWorld } from './world/loadWorld'
 import { ForestControls } from './ForestControls'
@@ -23,11 +23,29 @@ declare global {
   }
 }
 
-export default function MapView() {
+export interface MapViewProps {
+  /** Selected city id ('' for none). Omit to let the view keep its own selection */
+  selectedPlace?: string
+  /** A click on the map selected a city ('' for a click on empty ground) */
+  onSelectPlace?: (id: string) => void
+  /** Show the tuning panels (default true). Without them nothing highlights the selection */
+  showControls?: boolean
+  /** The map once the world is generated, and null when it is disposed */
+  onMapChange?: (map: StrategyMap | null) => void
+}
+
+export default function MapView({ selectedPlace: selectedProp, onSelectPlace, showControls = true, onMapChange }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<StrategyMap | null>(null)
   const [map, setMap] = useState<StrategyMap | null>(null)
-  const [selectedPlace, setSelectedPlace] = useState('')
+  const [ownSelectedPlace, setOwnSelectedPlace] = useState('')
+  const selectedPlace = selectedProp ?? ownSelectedPlace
+  const setSelectedPlace = (id: string) => {
+    setOwnSelectedPlace(id)
+    onSelectPlace?.(id)
+  }
+  const selectPlace = useEffectEvent(setSelectedPlace)
+  const notifyMap = useEffectEvent((value: StrategyMap | null) => onMapChange?.(value))
   const [forestSettings, setForestSettings] = useState(readForestSettings)
   const forestSettingsRef = useRef(forestSettings)
   const [parchmentSettings, setParchmentSettings] = useState(readParchmentSettings)
@@ -62,6 +80,7 @@ export default function MapView() {
       })
       mapRef.current = map
       setMap(map)
+      notifyMap(map)
       map.onStats = setStats
       if (import.meta.env.DEV) window.__strategyMap = map
       setLoading(false)
@@ -74,6 +93,7 @@ export default function MapView() {
       map?.dispose()
       mapRef.current = null
       setMap(null)
+      if (map) notifyMap(null)
       if (window.__strategyMap === map) delete window.__strategyMap
     }
   }, [])
@@ -88,7 +108,7 @@ export default function MapView() {
       if (!down || !e.isPrimary || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return
       down = null
       if (!mapRef.current) return
-      setSelectedPlace(mapRef.current.pickPlace(e.clientX, e.clientY) ?? '')
+      selectPlace(mapRef.current.pickPlace(e.clientX, e.clientY) ?? '')
       if (!import.meta.env.DEV) return
       const point = mapRef.current.pickImagePoint(e.clientX, e.clientY)
       if (!point) return
@@ -144,7 +164,7 @@ export default function MapView() {
     <div className="map-view">
       <div ref={containerRef} className="map-view__canvas" />
       {loading && <div className="map-view__loading">地図を生成中…</div>}
-      <aside className="map-controls" aria-label="地図の描画設定">
+      {showControls && <aside className="map-controls" aria-label="地図の描画設定">
         <SettingsExport forest={forestSettings} parchment={parchmentSettings} terrain={terrainSettings}
           render={renderSettings} places={placeSettings} />
         <OverlayTestControls map={map} selected={selectedPlace} onSelect={setSelectedPlace} />
@@ -155,7 +175,7 @@ export default function MapView() {
         <ForestControls settings={forestSettings} onChange={changeForestSettings} textureStatus={stats?.forestTexture} />
         <TerrainControls settings={terrainSettings} onChange={changeTerrainSettings}
           vertices={stats?.vertices} tiles={stats?.tiles} />
-      </aside>
+      </aside>}
       {import.meta.env.DEV && stats && (
         <div className="map-view__stats">
           {stats.fps.toFixed(0)} fps / {stats.tiles} tiles / {(stats.vertices / 1000).toFixed(0)}k verts / {stats.trees.toLocaleString()} trees / dist {stats.distance.toFixed(0)}
