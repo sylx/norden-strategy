@@ -33,8 +33,8 @@ interface Props {
 
 /** Test panel for the selection, road highlight and march overlays */
 export function OverlayTestControls({ map, selected, onSelect }: Props) {
-  const [neighbours, setNeighbours] = useState(true)
-  const [cityRoads, setCityRoads] = useState(true)
+  const [neighbours, setNeighbours] = useState(false)
+  const [cityRoads, setCityRoads] = useState(false)
   const [road, setRoad] = useState('')
   const [reverse, setReverse] = useState(false)
   const [from, setFrom] = useState('')
