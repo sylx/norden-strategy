@@ -10,6 +10,7 @@ interface Label {
   ground: THREE.Vector3
   hasEmblem: boolean
   element: HTMLDivElement
+  emblem: HTMLImageElement
   transform: string
   visible: boolean
 }
@@ -26,19 +27,23 @@ export class PlaceLabels {
     this.labels = places.map((place) => {
       const element = document.createElement('div')
       element.className = 'place-label'
-      const emblem = emblemUrl(place.belongTo)
-      if (emblem) {
-        const img = document.createElement('img')
-        img.src = emblem
-        img.alt = ''
-        element.append(img)
-      }
-      element.append(place.name)
+      const emblem = document.createElement('img')
+      emblem.alt = ''
+      element.append(emblem, place.name)
       this.layer.append(element)
       const ground = new THREE.Vector3(place.x, heights.surfaceAt(place.x, place.z) * heightScale, place.z)
-      return { place, ground, hasEmblem: Boolean(emblem), element, transform: '', visible: true }
+      const label: Label = { place, ground, hasEmblem: false, element, emblem, transform: '', visible: true }
+      setOwner(label, place.belongTo)
+      return label
     })
     container.append(this.layer)
+  }
+
+  /** Changes the factions the cities belong to (the emblem beside the name); cities not listed keep theirs */
+  setOwners(owners: Readonly<Record<string, string | undefined>>) {
+    for (const label of this.labels) {
+      if (Object.hasOwn(owners, label.place.id)) setOwner(label, owners[label.place.id])
+    }
   }
 
   applySettings(settings: PlaceSettings) {
@@ -92,4 +97,12 @@ export class PlaceLabels {
   dispose() {
     this.layer.remove()
   }
+}
+
+function setOwner(label: Label, owner: string | undefined) {
+  const url = emblemUrl(owner)
+  label.hasEmblem = Boolean(url)
+  label.emblem.hidden = !url
+  if (url) label.emblem.src = url
+  else label.emblem.removeAttribute('src')
 }

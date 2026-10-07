@@ -213,6 +213,15 @@ export class StrategyMap {
     this.labels.applySettings(settings)
   }
 
+  /**
+   * Changes the factions the cities belong to: their emblems on the map and
+   * beside their names. Cities not listed keep theirs; undefined is neutral.
+   */
+  setCityOwners(owners: Readonly<Record<string, string | undefined>>) {
+    this.cities.setOwners(owners)
+    this.labels.setOwners(owners)
+  }
+
   /** Selection rings under these cities (and their names drawn as selected) */
   setCityHighlights(highlights: readonly CityHighlight[]) {
     this.cityHighlights.set(highlights)

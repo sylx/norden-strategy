@@ -6,6 +6,4 @@ export { CITY_HIGHLIGHT_COLOR, type CityHighlight } from './map/engine/CityHighl
 export { ROAD_HIGHLIGHT_COLOR, type RoadHighlight } from './map/engine/RoadHighlights'
 export { MARCH_KINDS, type MarchKind } from './map/engine/MarchMarkers'
 export { PLACE_ART, emblemUrl } from './map/engine/Cities'
-export { PLACES, ROAD_LINKS, type Place, type PlaceType } from './map/world/placeLayout'
-export { CITY_LIST, CITY_MAP, type City } from './data/city'
-export { FACTION_LIST, FACTION_MAP, type Faction } from './data/faction'
+export * from './data'

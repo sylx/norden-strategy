@@ -29,13 +29,18 @@ npm run dev
 
 ## 他のアプリへの組み込み
 
-`src/index.ts` が外部向けの公開APIです（nordencult ルートのアプリがソースのまま読み込みます）。`MapView` は単体の画面と同じ部品で、次のpropsで外から制御できます（すべて省略可能）。
+`src/index.ts` が外部向けの公開APIです（nordencult ルートのアプリがソースのまま読み込みます）。都市・勢力・街道のデータだけが要るとき（ゲームの規則やそのテスト）は、地図の描画（three.js・DOM）を読み込まない `src/data.ts` を使います（ルートからは `norden-strategy/data`）。`MapView` は単体の画面と同じ部品で、次のpropsで外から制御できます（すべて省略可能）。
 
 | props | 振る舞い |
 | --- | --- |
 | `selectedPlace`, `onSelectPlace` | 選択中の都市ID（`''` で未選択）。クリックで選んだ都市を通知。省略時は内部で保持 |
 | `showControls` | 右上の調整パネルの表示（初期値 `true`）。非表示の時は選択の強調表示を呼び出し側で行う |
 | `onMapChange` | 地形の生成後に `StrategyMap`、破棄時に `null` を通知 |
+| `cityOwners` | 都市IDごとの所属勢力（`{ P004: 'carta' }`）。地図の紋章と都市名の横の紋章を切り替える。載っていない都市は元の所属のまま、`undefined` は中立。省略時は `src/data/` の所属 |
+
+`StrategyMap` の主なメソッド: `setCityHighlights`（都市の強調）、`setRoadHighlights`（街道の強調。`from` → `to` の向きに流れる模様）、`march` / `onMarchArrive`（行軍の表示と到着の通知）、`focusPlace`（カメラ移動）、`setCityOwners`（`cityOwners` と同じ）。
+
+地形の生成結果（Worker の出力）はモジュール内に1つ保持し、同じ設定で `MapView` を作り直したとき（シーンの切り替えで戻ったときなど）は再生成せずに使い回します。GPU の資源はマウントのたびに作り直します。
 
 ## 構成
 

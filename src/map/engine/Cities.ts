@@ -130,60 +130,83 @@ export class Cities {
   private readonly emblemPx = { value: PLACE_DEFAULTS.emblemPx }
   private settings = { ...PLACE_DEFAULTS }
 
+  private readonly terrain: THREE.ShaderMaterial
+  private readonly loader = new THREE.TextureLoader()
+  private readonly anisotropy: number
+  private readonly cardMaterials = new Map<string, THREE.ShaderMaterial>()
+  private readonly emblemMaterials = new Map<string, THREE.ShaderMaterial>()
+  /** Each place's ground height, owning faction and current meshes */
+  private readonly places = new Map<string, { place: Place; y: number; owner?: string; meshes: THREE.Mesh[] }>()
+
   constructor(places: readonly Place[], terrain: THREE.ShaderMaterial, heights: Heightfield, heightScale: number,
     anisotropy: number) {
-    const u = terrain.uniforms
-    const loader = new THREE.TextureLoader()
-    const createMaterial = (url: string, extra: Record<string, THREE.IUniform>) => {
-      const texture = loader.load(url)
-      texture.colorSpace = THREE.SRGBColorSpace
-      texture.anisotropy = Math.min(8, anisotropy)
-      this.textures.push(texture)
-      const material = new THREE.ShaderMaterial({
-        glslVersion: THREE.GLSL3, vertexShader, fragmentShader,
-        transparent: true, depthTest: false, depthWrite: false,
-        uniforms: {
-          uMacro: u.uMacro, uFlow: u.uFlow, uWorldSize: u.uWorldSize,
-          uHeightScale: u.uHeightScale, uTime: u.uTime, uDetailDistance: u.uDetailDistance,
-          uPlainsRelief: u.uPlainsRelief, uMountainRelief: u.uMountainRelief, uMaxOctaves: u.uMaxOctaves,
-          uTexturedForest: u.uTexturedForest, uForestDensity: u.uForestDensity, uForestShade: u.uForestShade,
-          uFogColor: u.uFogColor, uFogNear: u.uFogNear, uFogFar: u.uFogFar,
-          ...this.shared,
-          uMap: { value: texture },
-          ...extra,
-        },
+    this.terrain = terrain
+    this.anisotropy = anisotropy
+    this.cards.name = 'city-cards'
+    this.emblems.name = 'city-emblems'
+    this.group.add(this.cards, this.emblems)
+    this.group.name = 'cities'
+    for (const place of places) {
+      const entry = { place, y: heights.surfaceAt(place.x, place.z) * heightScale, owner: place.belongTo, meshes: [] }
+      this.places.set(place.id, entry)
+      this.addMeshes(entry)
+    }
+  }
+
+  private createMaterial(url: string, extra: Record<string, THREE.IUniform>) {
+    const u = this.terrain.uniforms
+    const texture = this.loader.load(url)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = Math.min(8, this.anisotropy)
+    this.textures.push(texture)
+    const material = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3, vertexShader, fragmentShader,
+      transparent: true, depthTest: false, depthWrite: false,
+      uniforms: {
+        uMacro: u.uMacro, uFlow: u.uFlow, uWorldSize: u.uWorldSize,
+        uHeightScale: u.uHeightScale, uTime: u.uTime, uDetailDistance: u.uDetailDistance,
+        uPlainsRelief: u.uPlainsRelief, uMountainRelief: u.uMountainRelief, uMaxOctaves: u.uMaxOctaves,
+        uTexturedForest: u.uTexturedForest, uForestDensity: u.uForestDensity, uForestShade: u.uForestShade,
+        uFogColor: u.uFogColor, uFogNear: u.uFogNear, uFogFar: u.uFogFar,
+        ...this.shared,
+        uMap: { value: texture },
+        ...extra,
+      },
+    })
+    this.materials.push(material)
+    return material
+  }
+
+  /** fading: the card gives way to an emblem when zoomed out */
+  private cardMaterial(type: PlaceType, fading: boolean) {
+    const key = `${type}:${fading}`
+    let material = this.cardMaterials.get(key)
+    if (!material) {
+      const art = PLACE_ART[type]
+      material = this.createMaterial(art.url, {
+        uRatio: { value: PLACE_KINDS[type].size }, uFixedPx: { value: 0 },
+        uAnchor: { value: new THREE.Vector2(...art.anchor) }, uAlpha: fading ? this.artAlpha : { value: 1 },
       })
-      this.materials.push(material)
-      return material
+      this.cardMaterials.set(key, material)
     }
-    const cardMaterials = new Map<string, THREE.ShaderMaterial>()
-    const emblemMaterials = new Map<string, THREE.ShaderMaterial>()
-    /** fading: the card gives way to an emblem when zoomed out */
-    const cardMaterial = (type: PlaceType, fading: boolean) => {
-      const key = `${type}:${fading}`
-      let material = cardMaterials.get(key)
-      if (!material) {
-        const art = PLACE_ART[type]
-        material = createMaterial(art.url, {
-          uRatio: { value: PLACE_KINDS[type].size }, uFixedPx: { value: 0 },
-          uAnchor: { value: new THREE.Vector2(...art.anchor) }, uAlpha: fading ? this.artAlpha : { value: 1 },
-        })
-        cardMaterials.set(key, material)
-      }
-      return material
+    return material
+  }
+
+  private emblemMaterial(url: string) {
+    let material = this.emblemMaterials.get(url)
+    if (!material) {
+      material = this.createMaterial(url, {
+        uRatio: { value: 1 }, uFixedPx: this.emblemPx,
+        uAnchor: { value: new THREE.Vector2(0.5, 0.5) }, uAlpha: this.emblemAlpha,
+      })
+      this.emblemMaterials.set(url, material)
     }
-    const emblemMaterial = (url: string) => {
-      let material = emblemMaterials.get(url)
-      if (!material) {
-        material = createMaterial(url, {
-          uRatio: { value: 1 }, uFixedPx: this.emblemPx,
-          uAnchor: { value: new THREE.Vector2(0.5, 0.5) }, uAlpha: this.emblemAlpha,
-        })
-        emblemMaterials.set(url, material)
-      }
-      return material
-    }
-    const addMesh = (group: THREE.Group, material: THREE.ShaderMaterial, place: Place, y: number, name: string) => {
+    return material
+  }
+
+  private addMeshes(entry: { place: Place; y: number; owner?: string; meshes: THREE.Mesh[] }) {
+    const { place, y } = entry
+    const addMesh = (group: THREE.Group, material: THREE.ShaderMaterial, name: string) => {
       const mesh = new THREE.Mesh(this.geometry, material)
       // The shader places the card; the position also orders the cards by depth
       mesh.position.set(place.x, y, place.z)
@@ -191,19 +214,24 @@ export class Cities {
       mesh.renderOrder = 3
       mesh.name = name
       group.add(mesh)
+      entry.meshes.push(mesh)
     }
+    const emblem = emblemUrl(entry.owner)
+    // Without an emblem the art stays, as on the 2D map
+    addMesh(emblem ? this.cards : this.group, this.cardMaterial(place.type, Boolean(emblem)), place.id)
+    if (emblem) addMesh(this.emblems, this.emblemMaterial(emblem), `${place.id}-emblem`)
+  }
 
-    for (const place of places) {
-      const y = heights.surfaceAt(place.x, place.z) * heightScale
-      const emblem = emblemUrl(place.belongTo)
-      // Without an emblem the art stays, as on the 2D map
-      addMesh(emblem ? this.cards : this.group, cardMaterial(place.type, Boolean(emblem)), place, y, place.id)
-      if (emblem) addMesh(this.emblems, emblemMaterial(emblem), place, y, `${place.id}-emblem`)
+  /** Changes the factions the cities belong to (their emblems); cities not listed keep theirs */
+  setOwners(owners: Readonly<Record<string, string | undefined>>) {
+    for (const [id, owner] of Object.entries(owners)) {
+      const entry = this.places.get(id)
+      if (!entry || entry.owner === owner) continue
+      for (const mesh of entry.meshes) mesh.removeFromParent()
+      entry.meshes = []
+      entry.owner = owner
+      this.addMeshes(entry)
     }
-    this.cards.name = 'city-cards'
-    this.emblems.name = 'city-emblems'
-    this.group.add(this.cards, this.emblems)
-    this.group.name = 'cities'
   }
 
   applySettings(settings: PlaceSettings) {
@@ -240,7 +268,7 @@ export class Cities {
   screenSize(place: Place, depth: number): { size: number; lift: number } {
     const card = cardPixels(place.type, depth, this.shared.uPxScale.value, this.settings)
     const cardLift = (0.5 - PLACE_ART[place.type].anchor[1]) * card
-    if (!emblemUrl(place.belongTo)) return { size: card, lift: cardLift }
+    if (!emblemUrl(this.places.get(place.id)?.owner)) return { size: card, lift: cardLift }
     const art = this.artAlpha.value
     return { size: THREE.MathUtils.lerp(this.settings.emblemPx, card, art), lift: cardLift * art }
   }

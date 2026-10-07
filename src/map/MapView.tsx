@@ -32,9 +32,13 @@ export interface MapViewProps {
   showControls?: boolean
   /** The map once the world is generated, and null when it is disposed */
   onMapChange?: (map: StrategyMap | null) => void
+  /** Faction of each city (its emblem). Omit to use the city data; cities not listed keep theirs */
+  cityOwners?: Readonly<Record<string, string | undefined>>
 }
 
-export default function MapView({ selectedPlace: selectedProp, onSelectPlace, showControls = true, onMapChange }: MapViewProps) {
+export default function MapView({
+  selectedPlace: selectedProp, onSelectPlace, showControls = true, onMapChange, cityOwners,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<StrategyMap | null>(null)
   const [map, setMap] = useState<StrategyMap | null>(null)
@@ -97,6 +101,10 @@ export default function MapView({ selectedPlace: selectedProp, onSelectPlace, sh
       if (window.__strategyMap === map) delete window.__strategyMap
     }
   }, [])
+
+  useEffect(() => {
+    if (map && cityOwners) map.setCityOwners(cityOwners)
+  }, [map, cityOwners])
 
   // Bring the selected city to the centre of the view
   useEffect(() => {
