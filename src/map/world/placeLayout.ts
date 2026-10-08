@@ -47,7 +47,7 @@ export const PLACE_POSITIONS: Readonly<Record<string, Vec2>> = {
 
 /** Pairs of cities joined by a road. The route itself is searched over the terrain. */
 export const ROAD_LINKS: readonly (readonly [string, string])[] = [
-  ['P000', 'P013'], ['P000', 'P018'], ['P001', 'P002'],['P001', 'P030'],['P002', 'P003'], ['P002', 'P004'],
+  ['P000', 'P013'], ['P000', 'P018'], ['P001', 'P002'],['P001', 'P030'], ['P002', 'P004'],
   ['P002', 'P030'], ['P003', 'P005'], ['P003', 'P008'], ['P004', 'P005'],
   ['P004', 'P012'], ['P005', 'P010'], ['P006', 'P007'], ['P007', 'P008'], ['P008', 'P009'],
   ['P008', 'P011'], ['P009', 'P011'], ['P009', 'P022'], ['P010', 'P011'], ['P010', 'P023'],
