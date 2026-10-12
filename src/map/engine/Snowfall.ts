@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { random } from './Forest'
+import { SNOW_PATCHY_Z } from './season'
 
 const FLAKES = 1500
 
@@ -8,7 +9,19 @@ attribute vec4 aFlake; // x, y (screen 0..1), layer (0 far .. 1 near), seed
 uniform float uTime;
 uniform vec2 uOffset;
 uniform float uPixelRatio;
+uniform mat4 uInvProjection;
+uniform mat4 uCameraWorld;
 varying float vAlpha;
+
+// z of the ground (sea level) seen through a point of the screen
+float groundZ(vec2 ndc) {
+  vec4 a = uInvProjection * vec4(ndc, -1.0, 1.0);
+  vec4 b = uInvProjection * vec4(ndc, 1.0, 1.0);
+  vec3 o = (uCameraWorld * vec4(a.xyz / a.w, 1.0)).xyz;
+  vec3 d = (uCameraWorld * vec4(b.xyz / b.w, 1.0)).xyz - o;
+  return d.y < -1e-5 ? o.z - d.z * o.y / d.y : -1e9;
+}
+
 void main() {
   float layer = aFlake.z;
   float seed = aFlake.w;
@@ -16,9 +29,12 @@ void main() {
   float fall = uTime * mix(0.03, 0.1, layer);
   float sway = sin(uTime * mix(0.5, 1.2, seed) + seed * 40.0) * mix(0.006, 0.025, layer);
   vec2 pos = aFlake.xy + vec2(sway + uTime * 0.008 * layer, -fall) + uOffset * mix(0.4, 1.3, layer);
-  gl_Position = vec4(fract(pos) * 2.0 - 1.0, 0.0, 1.0);
+  vec2 ndc = fract(pos) * 2.0 - 1.0;
+  gl_Position = vec4(ndc, 0.0, 1.0);
   gl_PointSize = mix(1.6, 4.8, layer) * uPixelRatio;
-  vAlpha = mix(0.4, 0.9, layer);
+  // Only over the snowy north, ending with the patches on the ground
+  float z = groundZ(ndc) + sin(seed * 91.0) * 10.0;
+  vAlpha = mix(0.4, 0.9, layer) * (1.0 - smoothstep(${SNOW_PATCHY_Z.toFixed(1)} - 20.0, ${SNOW_PATCHY_Z.toFixed(1)}, z));
 }
 `
 
@@ -33,9 +49,10 @@ void main() {
 `
 
 /**
- * Snow drifting across the screen in winter, drawn over the finished map
- * (under the cities). The flakes move in screen space and shift with the
- * camera's pan, nearer layers more, so they seem to hang between eye and land.
+ * Snow drifting across the screen in winter over the snowy north, drawn over
+ * the finished map (under the cities). The flakes move in screen space and
+ * shift with the camera's pan, nearer layers more, so they seem to hang
+ * between eye and land.
  */
 export class Snowfall {
   readonly scene = new THREE.Scene()
@@ -61,6 +78,8 @@ export class Snowfall {
         uOffset: { value: this.offset },
         uPixelRatio: { value: 1 },
         uOpacity: { value: 0 },
+        uInvProjection: { value: new THREE.Matrix4() },
+        uCameraWorld: { value: new THREE.Matrix4() },
       },
     })
     const points = new THREE.Points(this.geometry, this.material)
@@ -69,9 +88,11 @@ export class Snowfall {
   }
 
   /** opacity: 0 hides the snow; view: look-at point; viewWidth/Height: ground span on screen */
-  update(time: number, opacity: number, pixelRatio: number,
+  update(time: number, opacity: number, pixelRatio: number, camera: THREE.Camera,
     view: { x: number, z: number }, viewWidth: number, viewHeight: number) {
     const u = this.material.uniforms
+    u.uInvProjection.value.copy(camera.projectionMatrixInverse)
+    u.uCameraWorld.value.copy(camera.matrixWorld)
     u.uTime.value = time
     u.uOpacity.value = opacity
     u.uPixelRatio.value = pixelRatio

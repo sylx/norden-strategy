@@ -46,7 +46,9 @@ void main() {
   vDistance = length(center.xyz);
   vConifer = species == 3.0 ? 1.0 : 0.0;
   vSeed = fract(aTree.w * 53.17 + aTree.z * 7.1);
-  vSnow = uSeason.w * mix(0.45, 1.0, smoothstep(0.35, 0.85, snowDepth(p, macroAt(p).r)));
+  // Every tree in the north is snowy, fewer and fewer through the patchy band
+  vec3 bands = snowBands(p, macroAt(p).r);
+  vSnow = uSeason.w * max(bands.x, bands.y * step(fract(aTree.z * 13.7), 0.75 - bands.z * 0.6));
 }
 `
 

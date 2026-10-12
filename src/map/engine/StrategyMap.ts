@@ -345,7 +345,7 @@ export class StrategyMap {
     this.renderer.autoClear = false
     const groundHeight = 2 * viewDistance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)
     this.snowfall.update(now / 1000, this.season.w,
-      this.renderer.getPixelRatio(), view, groundHeight * this.camera.aspect, groundHeight)
+      this.renderer.getPixelRatio(), this.camera, view, groundHeight * this.camera.aspect, groundHeight)
     if (this.snowfall.visible) this.renderer.render(this.snowfall.scene, this.camera)
     this.renderer.render(this.overlay, this.camera)
     this.renderer.autoClear = true

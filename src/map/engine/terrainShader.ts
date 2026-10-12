@@ -1,5 +1,5 @@
 import { crystalGlsl } from './crystalZones'
-import { seasonGlsl } from './season'
+import { seasonGlsl, SNOW_FULL_Z, SNOW_PATCHY_Z } from './season'
 
 /**
  * Terrain shader.
@@ -70,11 +70,15 @@ vec3 noised(vec2 p) {
 
 ${crystalGlsl()}
 
-// Winter snow: 0 for a thin dusting (southern lowlands) up to 1 for deep cover
-// (the north and high ground). North is the top of the map, small z.
-float snowDepth(vec2 p, float h) {
-  float north = 1.0 - smoothstep(0.15, 0.85, p.y / uWorldSize);
-  return clamp(h * 0.08 + north * 1.15 + noised(p * 0.05 + 3.0).x * 0.3 - 0.15, 0.0, 1.0);
+// Winter snow bands by latitude (season.ts). x: deep cover, y: inside the
+// patchy band or north of it, z: how far into the patchy band (0 north edge,
+// 1 south edge). The edges wander, and high ground carries them a little south.
+vec3 snowBands(vec2 p, float h) {
+  float z = p.y + noised(p * 0.02 + 3.0).x * 14.0 - max(h, 0.0) * 2.0;
+  return vec3(
+    1.0 - smoothstep(${SNOW_FULL_Z.toFixed(1)} - 15.0, ${SNOW_FULL_Z.toFixed(1)} + 15.0, z),
+    1.0 - smoothstep(${SNOW_PATCHY_Z.toFixed(1)} - 12.0, ${SNOW_PATCHY_Z.toFixed(1)} + 12.0, z),
+    clamp((z - ${SNOW_FULL_Z.toFixed(1)}) / ${(SNOW_PATCHY_Z - SNOW_FULL_Z).toFixed(1)}, 0.0, 1.0));
 }
 
 // --- macro textures ----------------------------------------------------------
@@ -544,10 +548,10 @@ void main() {
     // Grassland: broad tonal patches
     float patchN = noised(p * 0.035).x * 0.5 + 0.5;
     float patchN2 = noised(p * 0.12 + 31.0).x * 0.5 + 0.5;
-    // Summer is the base look; spring fresh, autumn straw, winter dormant
-    vec3 grassYellow = seasonal(srgb(168.0, 194.0, 84.0), srgb(178.0, 186.0, 78.0), srgb(198.0, 170.0, 92.0), srgb(150.0, 148.0, 98.0));
-    vec3 grassLight = seasonal(srgb(122.0, 190.0, 70.0), srgb(140.0, 176.0, 62.0), srgb(180.0, 160.0, 82.0), srgb(132.0, 136.0, 90.0));
-    vec3 grassMid = seasonal(srgb(86.0, 160.0, 58.0), srgb(100.0, 146.0, 50.0), srgb(152.0, 128.0, 64.0), srgb(108.0, 114.0, 78.0));
+    // Summer is the base look; spring fresh, autumn straw, winter withered
+    vec3 grassYellow = seasonal(srgb(168.0, 194.0, 84.0), srgb(178.0, 186.0, 78.0), srgb(198.0, 170.0, 92.0), srgb(176.0, 146.0, 92.0));
+    vec3 grassLight = seasonal(srgb(122.0, 190.0, 70.0), srgb(140.0, 176.0, 62.0), srgb(180.0, 160.0, 82.0), srgb(156.0, 126.0, 80.0));
+    vec3 grassMid = seasonal(srgb(86.0, 160.0, 58.0), srgb(100.0, 146.0, 50.0), srgb(152.0, 128.0, 64.0), srgb(126.0, 100.0, 64.0));
     vec3 albedo = mix(grassLight, grassYellow, smoothstep(0.5, 0.85, patchN));
     albedo = mix(albedo, grassMid, smoothstep(0.45, 0.85, patchN2) * 0.6 + smoothstep(4.0, 12.0, h) * 0.4);
 
@@ -578,17 +582,19 @@ void main() {
     float rockiness = clamp(smoothstep(0.18, 0.5, slope) * (0.4 + m.b) + smoothstep(0.35, 0.9, m.b) * 0.5, 0.0, 1.0);
     albedo = mix(albedo, rock, rockiness);
 
-    // Snow caps: lower on north-facing slopes, rock shows through on cliffs
-    float snowLine = 14.5 - uSeason.w * 5.0 + noised(p * 0.04 - 9.0).x * 2.0 + N.z * 3.0;
+    // Snow caps: lower on north-facing slopes, rock shows through on cliffs.
+    // In winter they come down further where the land is snowy.
+    vec3 bands = snowBands(p, h);
+    float snowLine = 14.5 - uSeason.w * bands.y * 5.0 + noised(p * 0.04 - 9.0).x * 2.0 + N.z * 3.0;
     float snow = smoothstep(snowLine, snowLine + 1.0, h) * (1.0 - smoothstep(0.55, 0.85, slope)) * (1.0 - desert);
     albedo = mix(albedo, srgb(242.0, 245.0, 250.0), snow);
 
     // Winter snow over the low ground, laid on top of the woods further down
-    float depth = snowDepth(p, h);
-    // The thin cover in the south breaks into patches (averaged out from afar)
-    float patches = smoothstep(-0.25, 0.35, noised(p * 0.3 + 9.0).x + depth * 1.2 - 0.4);
-    patches = mix(patches, 0.6, smoothstep(0.8, 2.5, footprint));
-    float winterSnow = uSeason.w * mix(0.5 * patches, 1.0, smoothstep(0.35, 0.85, depth))
+    // Patches thin out towards the south edge of their band (averaged out from afar)
+    float patches = smoothstep(-0.15, 0.25,
+      noised(p * 0.3 + 9.0).x * 0.6 + noised(p * 0.06 - 4.0).x * 0.6 + 0.35 - bands.z * 0.8);
+    patches = mix(patches, 0.7 - bands.z * 0.45, smoothstep(0.8, 2.5, footprint));
+    float winterSnow = uSeason.w * max(bands.x, bands.y * patches)
       * (1.0 - smoothstep(0.6, 0.9, slope)) * (1.0 - desert * 0.85);
 
     // Forest canopy
@@ -598,9 +604,10 @@ void main() {
       // Flat, mottled understory; the cutout cards supply the crown silhouettes.
       float mottling = noised(p * 0.8).x * 0.5 + 0.5;
       vec3 floorColor = mix(srgb(47.0, 68.0, 30.0), srgb(67.0, 91.0, 39.0), mottling);
-      // Fresher in spring, fallen leaves in autumn
+      // Fresher in spring, fallen leaves in autumn and winter
       floorColor *= mix(vec3(1.0), vec3(1.1, 1.18, 1.0), uSeason.x);
       floorColor = mix(floorColor, mix(srgb(104.0, 58.0, 28.0), srgb(142.0, 92.0, 38.0), mottling), uSeason.z * 0.8);
+      floorColor = mix(floorColor, mix(srgb(84.0, 62.0, 40.0), srgb(112.0, 84.0, 52.0), mottling), uSeason.w * 0.8);
       floorColor *= mix(1.3, 0.65, uForestShade);
       albedo = mix(albedo, floorColor, fm * sqrt(uForestDensity) * 0.88);
     }

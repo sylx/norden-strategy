@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { IMAGE_TO_WORLD } from '../world/islandDesign'
 
 export type MapSeason = 'spring' | 'summer' | 'autumn' | 'winter'
 
@@ -8,6 +9,13 @@ export const MAP_SEASONS: readonly { id: MapSeason, label: string }[] = [
   { id: 'autumn', label: '秋' },
   { id: 'winter', label: '冬' },
 ]
+
+/**
+ * Winter snow by latitude (north is small z), in world units: deep cover
+ * north of image y 2790, patches down to image y 4600, none further south.
+ */
+export const SNOW_FULL_Z = 2790 * IMAGE_TO_WORLD
+export const SNOW_PATCHY_Z = 4600 * IMAGE_TO_WORLD
 
 /** Seconds a change of season takes to fade in */
 export const SEASON_FADE = 1.2
@@ -31,7 +39,7 @@ vec3 autumnLeaf(float id) {
 vec3 foliage(vec3 green, float id) {
   vec3 spring = mix(green, recolor(green, seasonRgb(120.0, 184.0, 58.0)) * 1.1, 0.7);
   vec3 autumn = recolor(green, autumnLeaf(id)) * 1.15;
-  vec3 winter = recolor(green, seasonRgb(104.0, 90.0, 76.0)) * 0.85;
+  vec3 winter = recolor(green, seasonRgb(128.0, 94.0, 62.0)) * 0.85;
   return spring * uSeason.x + green * uSeason.y + autumn * uSeason.z + winter * uSeason.w;
 }
 `
