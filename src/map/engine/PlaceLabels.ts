@@ -50,6 +50,8 @@ export class PlaceLabels {
     this.settings = { ...settings }
     this.layer.hidden = !settings.labels
     this.layer.style.setProperty('--place-label-emblem', `${settings.labelEmblemPx}px`)
+    this.layer.style.setProperty('--place-label-size', `${settings.labelFontPx}px`)
+    this.layer.style.setProperty('--place-label-emblems-size', `${settings.labelFontEmblemsPx}px`)
   }
 
   /** Labels of these cities are drawn as selected */

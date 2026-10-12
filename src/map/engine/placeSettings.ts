@@ -10,6 +10,9 @@ export interface PlaceSettings {
   emblemPx: number
   /** Size (CSS px) of the emblem beside the name while the city art is shown */
   labelEmblemPx: number
+  /** Font size (CSS px) of the names while the city art is shown / while the cities are emblems */
+  labelFontPx: number
+  labelFontEmblemsPx: number
   roadWidth: number
   /** Narrowest on-screen road width (CSS px) */
   roadMinPx: number
@@ -21,7 +24,7 @@ export interface PlaceSettings {
 }
 
 export const PLACE_DEFAULTS: PlaceSettings = {
-  citySize: 19, cityMinPx: 10, cityMaxPx: 240, emblemSwitchPx: 34, emblemPx: 60, labelEmblemPx: 52,
+  citySize: 19, cityMinPx: 10, cityMaxPx: 240, emblemSwitchPx: 34, emblemPx: 60, labelEmblemPx: 52, labelFontPx: 20, labelFontEmblemsPx: 13,
   roadWidth: 3, roadMinPx: 3, roadOverview: 0.8, outline: 1, labels: true,
 }
 
@@ -32,6 +35,8 @@ export const PLACE_SLIDERS = [
   { key: 'emblemSwitchPx', label: '紋章に切り替える大きさ（px）', min: 0, max: 200, step: 1, digits: 0 },
   { key: 'emblemPx', label: '紋章の大きさ（px）', min: 12, max: 96, step: 1, digits: 0 },
   { key: 'labelEmblemPx', label: '都市表示時の紋章の大きさ（px）', min: 8, max: 64, step: 1, digits: 0 },
+  { key: 'labelFontPx', label: '都市表示時の地名の大きさ（px）', min: 8, max: 40, step: 1, digits: 0 },
+  { key: 'labelFontEmblemsPx', label: '紋章表示時の地名の大きさ（px）', min: 8, max: 40, step: 1, digits: 0 },
   { key: 'roadWidth', label: '街道の幅', min: 0.3, max: 4, step: 0.1, digits: 1 },
   { key: 'roadMinPx', label: '街道の最小幅（px）', min: 1, max: 6, step: 0.1, digits: 1 },
   { key: 'roadOverview', label: '紋章表示時の街道の強調', min: 0, max: 1, step: 0.05, digits: 2 },

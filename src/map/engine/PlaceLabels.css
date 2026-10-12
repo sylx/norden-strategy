@@ -14,7 +14,8 @@
   gap: 3px;
   white-space: nowrap;
   color: #fff9df;
-  font: 700 13px/1.2 "Hiragino Mincho ProN", "Yu Mincho", serif;
+  /* Noto Serif JP is loaded by the page (index.html of nordencult / this app) */
+  font: 700 var(--place-label-size, 20px)/1.2 "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", serif;
   letter-spacing: 0.06em;
   /* A solid ink rim (the fill is painted over the inner half of the stroke)
      and a soft dark halo keep the names legible on snow as well as on grass */
@@ -39,6 +40,10 @@
 .place-labels[hidden],
 .place-label[hidden] {
   display: none;
+}
+
+.place-labels--emblems .place-label {
+  font-size: var(--place-label-emblems-size, 13px);
 }
 
 .place-labels--emblems .place-label img {
