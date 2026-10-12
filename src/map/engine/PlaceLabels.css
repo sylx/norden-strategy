@@ -16,7 +16,11 @@
   color: #fff9df;
   font: 700 13px/1.2 "Hiragino Mincho ProN", "Yu Mincho", serif;
   letter-spacing: 0.06em;
-  text-shadow: 0 0 2px #000, 0 0 3px #000, 0 1px 4px #000c;
+  /* A solid ink rim (the fill is painted over the inner half of the stroke)
+     and a soft dark halo keep the names legible on snow as well as on grass */
+  -webkit-text-stroke: 3px #1b130b;
+  paint-order: stroke fill;
+  text-shadow: 0 0 3px #000, 0 0 6px #000c, 0 1px 8px #0009;
   user-select: none;
   will-change: transform;
 }
@@ -24,12 +28,12 @@
 .place-label img {
   width: var(--place-label-emblem, 20px);
   height: var(--place-label-emblem, 20px);
-  filter: drop-shadow(0 0 2px #000a);
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 3px #000a);
 }
 
 .place-label--selected {
   color: #ffe08a;
-  text-shadow: 0 0 2px #000, 0 0 4px #000, 0 0 10px #c8901c;
+  text-shadow: 0 0 3px #000, 0 0 6px #000c, 0 0 12px #c8901c;
 }
 
 .place-labels[hidden],
