@@ -342,8 +342,9 @@ export class StrategyMap {
     this.roadHighlights.update(dt)
     this.cityHighlights.update(dt, art)
     this.marches.update(dt, this.camera, this.viewSize.width, this.viewSize.height, this.pxScale)
-    // Heat shimmer over the desert in summer
-    this.parchment.setHeat(this.season.y, now / 1000)
+    // Heat shimmer over the desert in summer, stronger as the camera comes down
+    const zoom = 1 - THREE.MathUtils.clamp(Math.log(viewDistance / 40) / Math.log(1500 / 40), 0, 1)
+    this.parchment.setHeat(this.season.y, now / 1000, zoom)
     this.parchment.render(this.renderer, this.scene, this.camera)
     this.renderer.autoClear = false
     const groundHeight = 2 * viewDistance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)
