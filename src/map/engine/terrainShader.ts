@@ -519,7 +519,8 @@ void main() {
   float footprint = max(length(fwidth(p)), 1e-4);
   float octaves = octavesFor(footprint);
   vec3 L = normalize(uSunDir);
-  vec3 sun = srgb(255.0, 246.0, 225.0);
+  // Summer sunshine is stronger and warmer
+  vec3 sun = mix(srgb(255.0, 246.0, 225.0), srgb(255.0, 234.0, 192.0) * 1.18, uSeason.y);
 
   vec4 m = macroAt(p);
   vec4 fl = flowAt(p);
@@ -699,7 +700,11 @@ void main() {
     albedo = mix(albedo, albedo * mix(vec3(0.75), vec3(0.9, 0.85, 0.7), arid), bank);
 
     float diff = max(dot(N, L), 0.0);
-    vec3 ambient = vec3(0.92, 0.96, 1.08) * mix(vec3(1.0), vec3(0.95, 0.98, 1.06), uSeason.w) * (0.38 + 0.12 * N.y);
+    // Summer: more vivid land, and cooler, deeper shade against the warm sun
+    albedo = max(mix(vec3(luma(albedo)), albedo, 1.0 + 0.15 * uSeason.y), 0.0);
+    vec3 ambient = vec3(0.92, 0.96, 1.08)
+      * mix(vec3(1.0), vec3(0.95, 0.98, 1.06), uSeason.w) * mix(vec3(1.0), vec3(0.82, 0.87, 0.98), uSeason.y)
+      * (0.38 + 0.12 * N.y);
     color = albedo * (ambient + diff * 0.95 * sun);
     // Glint on snow
     color += sun * pow(max(dot(reflect(-L, N), V), 0.0), 20.0) * 0.12 * max(snow, winterSnow);

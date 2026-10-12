@@ -86,6 +86,8 @@ void main() {
   if (alpha < uAlphaCut) discard;
   vec3 tint = mix(vec3(0.52, 1.0, 0.90), vec3(1.12, 1.0, 0.64), uWarmth);
   vec3 col = seasonalCrown(texel.rgb * tint) * uBrightness * vTone;
+  // Summer: richer leaves in warm sunshine
+  col = max(mix(vec3(luma(col)), col, 1.0 + 0.12 * uSeason.y), 0.0) * mix(vec3(1.0), vec3(1.08, 1.05, 0.95), uSeason.y);
   float crownHeight = fract(vUv.y * 2.0);
   // Winter: snow resting on the upper, lit side of the crown
   float snow = vSnow * smoothstep(0.45, 0.8, crownHeight + (vSeed - 0.5) * 0.2) * smoothstep(0.02, 0.1, luma(col));

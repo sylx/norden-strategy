@@ -12,10 +12,10 @@ export const MAP_SEASONS: readonly { id: MapSeason, label: string }[] = [
 
 /**
  * Winter snow by latitude (north is small z), in world units: deep cover
- * north of image y 2790, patches down to image y 4600, none further south.
+ * north of image y 2300, patches down to image y 3600, none further south.
  */
-export const SNOW_FULL_Z = 2790 * IMAGE_TO_WORLD
-export const SNOW_PATCHY_Z = 4600 * IMAGE_TO_WORLD
+export const SNOW_FULL_Z = 2300 * IMAGE_TO_WORLD
+export const SNOW_PATCHY_Z = 3600 * IMAGE_TO_WORLD
 
 /** Seconds a change of season takes to fade in */
 export const SEASON_FADE = 1.2
