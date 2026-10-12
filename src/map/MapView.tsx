@@ -13,6 +13,8 @@ import { PlaceControls } from './PlaceControls'
 import { readPlaceSettings, savePlaceSettings, type PlaceSettings } from './engine/placeSettings'
 import { SettingsExport } from './SettingsExport'
 import { OverlayTestControls } from './OverlayTestControls'
+import { SeasonControls } from './SeasonControls'
+import type { MapSeason } from './engine/season'
 import { PLACE_POSITIONS, PLACES } from './world/placeLayout'
 import './MapView.css'
 
@@ -34,10 +36,12 @@ export interface MapViewProps {
   onMapChange?: (map: StrategyMap | null) => void
   /** Faction of each city (its emblem). Omit to use the city data; cities not listed keep theirs */
   cityOwners?: Readonly<Record<string, string | undefined>>
+  /** Season of the land (fades over when it changes). Omit to let the view keep its own (summer at first) */
+  season?: MapSeason
 }
 
 export default function MapView({
-  selectedPlace: selectedProp, onSelectPlace, showControls = true, onMapChange, cityOwners,
+  selectedPlace: selectedProp, onSelectPlace, showControls = true, onMapChange, cityOwners, season: seasonProp,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<StrategyMap | null>(null)
@@ -49,6 +53,9 @@ export default function MapView({
     onSelectPlace?.(id)
   }
   const selectPlace = useEffectEvent(setSelectedPlace)
+  const [ownSeason, setOwnSeason] = useState<MapSeason>('summer')
+  const season = seasonProp ?? ownSeason
+  const seasonRef = useRef(season)
   const notifyMap = useEffectEvent((value: StrategyMap | null) => onMapChange?.(value))
   const [forestSettings, setForestSettings] = useState(readForestSettings)
   const forestSettingsRef = useRef(forestSettings)
@@ -81,6 +88,7 @@ export default function MapView({
         terrain: terrainSettingsRef.current,
         render: renderSettingsRef.current,
         places: placeSettingsRef.current,
+        season: seasonRef.current,
       })
       mapRef.current = map
       setMap(map)
@@ -105,6 +113,12 @@ export default function MapView({
   useEffect(() => {
     if (map && cityOwners) map.setCityOwners(cityOwners)
   }, [map, cityOwners])
+
+  // The map is built in the season of the time it is ready, then fades between them
+  useEffect(() => {
+    seasonRef.current = season
+    map?.setSeason(season)
+  }, [map, season])
 
   // Bring the selected city to the centre of the view
   useEffect(() => {
@@ -180,6 +194,7 @@ export default function MapView({
       {showControls && <aside className="map-controls" aria-label="地図の描画設定">
         <SettingsExport forest={forestSettings} parchment={parchmentSettings} terrain={terrainSettings}
           render={renderSettings} places={placeSettings} />
+        <SeasonControls season={season} onChange={setOwnSeason} />
         <OverlayTestControls map={map} selected={selectedPlace} onSelect={setSelectedPlace} />
         <PlaceControls settings={placeSettings} onChange={changePlaceSettings} warnings={warnings} />
         <RenderControls settings={renderSettings} onChange={changeRenderSettings}

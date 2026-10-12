@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { WorldData } from '../world/generateWorld'
 import { terrainFragmentShader, terrainVertexShader } from './terrainShader'
 import { TERRAIN_DEFAULTS, type TerrainSettings } from './terrainSettings'
+import { seasonWeights } from './season'
 
 const MAX_DEPTH = 10
 /** Deepest level with its own roughness entry; deeper tiles use their parent's */
@@ -74,6 +75,7 @@ export class TerrainQuadtree {
         uTexturedForest: { value: 0 },
         uForestDensity: { value: 0.85 },
         uForestShade: { value: 0.55 },
+        uSeason: { value: seasonWeights('summer') },
         uSunDir: { value: new THREE.Vector3(-0.55, 0.7, -0.45) },
         uFogColor: { value: new THREE.Color(0x10264a) },
         uFogNear: { value: 1900 },

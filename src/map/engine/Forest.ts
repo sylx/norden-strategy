@@ -4,6 +4,7 @@ import type { WorldData } from '../world/generateWorld'
 import { groundObjectDepth, terrainCommon } from './terrainShader'
 import { FOREST_DEFAULTS, type ForestSettings } from './forestSettings'
 import { crystalDistance } from './crystalZones'
+import { seasonGlsl } from './season'
 
 const SPACING = 1.85
 const CHUNK_SIZE = 64
@@ -18,6 +19,9 @@ uniform float uConifers;
 out vec2 vUv;
 out float vTone;
 out float vDistance;
+out float vConifer;
+out float vSeed;
+out float vSnow;
 void main() {
   vec2 p = aTree.xy;
   float spacing = distance(cameraPosition, vec3(p.x, 0.0, p.y)) / uDetailDistance;
@@ -40,6 +44,9 @@ void main() {
   vUv = (cell + mix(vec2(0.006), vec2(0.994), cardUv)) * 0.5;
   vTone = mix(1.0, 0.78 + aTree.z * 0.4, uVariation);
   vDistance = length(center.xyz);
+  vConifer = species == 3.0 ? 1.0 : 0.0;
+  vSeed = fract(aTree.w * 53.17 + aTree.z * 7.1);
+  vSnow = uSeason.w * mix(0.45, 1.0, smoothstep(0.35, 0.85, snowDepth(p, macroAt(p).r)));
 }
 `
 
@@ -52,10 +59,23 @@ uniform float uAlphaCut;
 uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
+uniform vec4 uSeason;
 in vec2 vUv;
 in float vTone;
 in float vDistance;
+in float vConifer;
+in float vSeed;
+in float vSnow;
 out vec4 fragColor;
+${seasonGlsl}
+// Conifers keep their needles all year; about one broadleaf in ten blossoms in spring
+vec3 seasonalCrown(vec3 col) {
+  vec3 broad = foliage(col, vSeed);
+  vec3 blossom = mix(recolor(col, seasonRgb(242.0, 196.0, 210.0)) * 1.9, col, 0.2);
+  broad = mix(broad, blossom, uSeason.x * step(vSeed, 0.1));
+  vec3 conifer = col * mix(1.0, 0.85, uSeason.w);
+  return mix(broad, conifer, vConifer);
+}
 void main() {
   vec4 texel = texture(uAtlas, vUv);
   // Opaque depth-writing cutouts need no per-tree transparency sorting.
@@ -63,8 +83,11 @@ void main() {
   float alpha = smoothstep(0.3 - width, 0.3 + width, texel.a);
   if (alpha < uAlphaCut) discard;
   vec3 tint = mix(vec3(0.52, 1.0, 0.90), vec3(1.12, 1.0, 0.64), uWarmth);
-  vec3 col = texel.rgb * tint * uBrightness * vTone;
+  vec3 col = seasonalCrown(texel.rgb * tint) * uBrightness * vTone;
   float crownHeight = fract(vUv.y * 2.0);
+  // Winter: snow resting on the upper, lit side of the crown
+  float snow = vSnow * smoothstep(0.45, 0.8, crownHeight + (vSeed - 0.5) * 0.2) * smoothstep(0.02, 0.1, luma(col));
+  col = mix(col, seasonRgb(236.0, 240.0, 248.0) * (0.7 + 2.0 * luma(col)), clamp(snow * 0.85, 0.0, 1.0));
   col *= mix(1.0 - uShade * 0.5, 1.0, smoothstep(0.12, 0.7, crownHeight));
   col = mix(col, uFogColor, smoothstep(uFogNear, uFogFar, vDistance));
   fragColor = vec4(col, alpha);
@@ -100,6 +123,7 @@ export class Forest {
         uHeightScale: u.uHeightScale, uTime: u.uTime, uDetailDistance: u.uDetailDistance,
         uPlainsRelief: u.uPlainsRelief, uMountainRelief: u.uMountainRelief, uMaxOctaves: u.uMaxOctaves,
         uTexturedForest: u.uTexturedForest, uForestDensity: u.uForestDensity, uForestShade: u.uForestShade,
+        uSeason: u.uSeason,
         uFogColor: u.uFogColor, uFogNear: u.uFogNear, uFogFar: u.uFogFar,
         uAtlas: { value: null }, uSize: { value: this.settings.size },
         uVariation: { value: this.settings.variation }, uConifers: { value: this.settings.conifers },

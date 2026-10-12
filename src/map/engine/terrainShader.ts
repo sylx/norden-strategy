@@ -1,4 +1,5 @@
 import { crystalGlsl } from './crystalZones'
+import { seasonGlsl } from './season'
 
 /**
  * Terrain shader.
@@ -25,6 +26,8 @@ uniform float uTime;
 uniform float uTexturedForest;
 uniform float uForestDensity;
 uniform float uForestShade;
+// Season weights: x spring, y summer, z autumn, w winter (they sum to 1)
+uniform vec4 uSeason;
 
 // --- hashing -----------------------------------------------------------------
 uint pcg(uint v) {
@@ -66,6 +69,13 @@ vec3 noised(vec2 p) {
 }
 
 ${crystalGlsl()}
+
+// Winter snow: 0 for a thin dusting (southern lowlands) up to 1 for deep cover
+// (the north and high ground). North is the top of the map, small z.
+float snowDepth(vec2 p, float h) {
+  float north = 1.0 - smoothstep(0.15, 0.85, p.y / uWorldSize);
+  return clamp(h * 0.08 + north * 1.15 + noised(p * 0.05 + 3.0).x * 0.3 - 0.15, 0.0, 1.0);
+}
 
 // --- macro textures ----------------------------------------------------------
 // Smooth B-spline bicubic, so lighting shows no texel grid
@@ -352,6 +362,36 @@ in vec3 vWorld;
 out vec4 fragColor;
 
 vec3 srgb(float r, float g, float b) { return pow(vec3(r, g, b) / 255.0, vec3(2.2)); }
+${seasonGlsl}
+vec3 seasonal(vec3 spring, vec3 summer, vec3 autumn, vec3 winter) {
+  return spring * uSeason.x + summer * uSeason.y + autumn * uSeason.z + winter * uSeason.w;
+}
+
+// Autumn fields of ripe grain: strips of parcels, each block of land ploughed
+// in its own direction, with dark balks between them and furrows up close.
+vec3 grainFields(vec2 p, float footprint) {
+  ivec2 block = ivec2(floor(p / 48.0));
+  float ang = hash21(block + ivec2(13, 71)) * 3.1416;
+  vec2 q = mat2(cos(ang), sin(ang), -sin(ang), cos(ang)) * p;
+  vec2 cell = q / vec2(5.0, 2.2);
+  vec2 f = fract(cell);
+  float pick = hash21(ivec2(floor(cell)) + block * 97);
+  vec3 gold = srgb(222.0, 178.0, 72.0);
+  vec3 deepGold = srgb(196.0, 146.0, 58.0);
+  vec3 stubble = srgb(214.0, 196.0, 138.0);
+  vec3 crop = pick < 0.45 ? gold : pick < 0.75 ? deepGold : stubble;
+  crop *= 0.92 + 0.16 * (noised(p * 0.5).x * 0.5 + 0.5);
+  float furrowVis = smoothstep(0.12, 0.04, footprint);
+  crop *= 1.0 - furrowVis * 0.14 * (0.5 + 0.5 * sin(q.y * 18.0));
+  // Balks one pixel wide, gone once the parcels shrink to a few pixels
+  vec2 fw = max(fwidth(cell), vec2(1e-4));
+  vec2 edge = min(f, 1.0 - f) / fw;
+  float balk = (1.0 - smoothstep(0.5, 1.5, min(edge.x, edge.y))) * smoothstep(0.3, 0.12, max(fw.x, fw.y));
+  crop = mix(crop, srgb(126.0, 112.0, 66.0), balk * 0.6);
+  // From afar the parcels average out instead of shimmering
+  vec3 average = gold * 0.45 + deepGold * 0.3 + stubble * 0.25;
+  return mix(crop, average, smoothstep(0.5, 1.5, footprint));
+}
 
 // Directional swell; constant directions keep the pattern undistorted
 const vec2 SWELL_D0 = vec2(0.83, 0.55);
@@ -504,9 +544,10 @@ void main() {
     // Grassland: broad tonal patches
     float patchN = noised(p * 0.035).x * 0.5 + 0.5;
     float patchN2 = noised(p * 0.12 + 31.0).x * 0.5 + 0.5;
-    vec3 grassYellow = srgb(178.0, 186.0, 78.0);
-    vec3 grassLight = srgb(140.0, 176.0, 62.0);
-    vec3 grassMid = srgb(100.0, 146.0, 50.0);
+    // Summer is the base look; spring fresh, autumn straw, winter dormant
+    vec3 grassYellow = seasonal(srgb(168.0, 194.0, 84.0), srgb(178.0, 186.0, 78.0), srgb(198.0, 170.0, 92.0), srgb(150.0, 148.0, 98.0));
+    vec3 grassLight = seasonal(srgb(122.0, 190.0, 70.0), srgb(140.0, 176.0, 62.0), srgb(180.0, 160.0, 82.0), srgb(132.0, 136.0, 90.0));
+    vec3 grassMid = seasonal(srgb(86.0, 160.0, 58.0), srgb(100.0, 146.0, 50.0), srgb(152.0, 128.0, 64.0), srgb(108.0, 114.0, 78.0));
     vec3 albedo = mix(grassLight, grassYellow, smoothstep(0.5, 0.85, patchN));
     albedo = mix(albedo, grassMid, smoothstep(0.45, 0.85, patchN2) * 0.6 + smoothstep(4.0, 12.0, h) * 0.4);
 
@@ -519,6 +560,17 @@ void main() {
       albedo = mix(albedo, sand, desert);
     }
 
+    // Autumn: parts of the flat lowland grass are fields of ripe grain
+    if (uSeason.z > 0.0) {
+      float region = noised(p * 0.018 + 51.0).x * 0.5 + 0.5 + noised(p * 0.07 - 17.0).x * 0.06;
+      float fields = smoothstep(0.56, 0.6, region)
+        * (1.0 - smoothstep(0.06, 0.16, slope))
+        * smoothstep(0.4, 1.0, h) * (1.0 - smoothstep(6.0, 9.0, h))
+        * (1.0 - arid) * (1.0 - smoothstep(0.1, 0.3, m.a)) * (1.0 - smoothstep(0.15, 0.3, m.g))
+        * (1.0 - smoothstep(0.2, 0.4, m.b)) * (1.0 - crystalMask(p));
+      if (fields > 0.0) albedo = mix(albedo, grainFields(p, footprint), fields * uSeason.z);
+    }
+
     // Rock on steep ground and mountain crests (red sandstone in the desert)
     float rockN = noised(p * 0.6).x * 0.5 + 0.5;
     vec3 rock = mix(srgb(138.0, 118.0, 86.0), srgb(104.0, 94.0, 78.0), rockN);
@@ -527,9 +579,17 @@ void main() {
     albedo = mix(albedo, rock, rockiness);
 
     // Snow caps: lower on north-facing slopes, rock shows through on cliffs
-    float snowLine = 14.5 + noised(p * 0.04 - 9.0).x * 2.0 + N.z * 3.0;
+    float snowLine = 14.5 - uSeason.w * 5.0 + noised(p * 0.04 - 9.0).x * 2.0 + N.z * 3.0;
     float snow = smoothstep(snowLine, snowLine + 1.0, h) * (1.0 - smoothstep(0.55, 0.85, slope)) * (1.0 - desert);
     albedo = mix(albedo, srgb(242.0, 245.0, 250.0), snow);
+
+    // Winter snow over the low ground, laid on top of the woods further down
+    float depth = snowDepth(p, h);
+    // The thin cover in the south breaks into patches (averaged out from afar)
+    float patches = smoothstep(-0.25, 0.35, noised(p * 0.3 + 9.0).x + depth * 1.2 - 0.4);
+    patches = mix(patches, 0.6, smoothstep(0.8, 2.5, footprint));
+    float winterSnow = uSeason.w * mix(0.5 * patches, 1.0, smoothstep(0.35, 0.85, depth))
+      * (1.0 - smoothstep(0.6, 0.9, slope)) * (1.0 - desert * 0.85);
 
     // Forest canopy
     vec2 forest = forestMask(m, p);
@@ -538,6 +598,9 @@ void main() {
       // Flat, mottled understory; the cutout cards supply the crown silhouettes.
       float mottling = noised(p * 0.8).x * 0.5 + 0.5;
       vec3 floorColor = mix(srgb(47.0, 68.0, 30.0), srgb(67.0, 91.0, 39.0), mottling);
+      // Fresher in spring, fallen leaves in autumn
+      floorColor *= mix(vec3(1.0), vec3(1.1, 1.18, 1.0), uSeason.x);
+      floorColor = mix(floorColor, mix(srgb(104.0, 58.0, 28.0), srgb(142.0, 92.0, 38.0), mottling), uSeason.z * 0.8);
       floorColor *= mix(1.3, 0.65, uForestShade);
       albedo = mix(albedo, floorColor, fm * sqrt(uForestDensity) * 0.88);
     }
@@ -549,6 +612,7 @@ void main() {
       vec3 conifer = srgb(30.0, 74.0, 52.0);
       vec3 col = mix(mid, dark, patchN2 * 0.6);
       col = mix(col, light, smoothstep(0.65, 1.0, c.tone) * 0.6);
+      col = foliage(col, clamp(c.tone * 0.7 + patchN2 * 0.6 - 0.15, 0.0, 1.0));
       col = mix(col, conifer, clamp(smoothstep(0.3, 0.0, c.tone) * 0.7 + smoothstep(8.0, 14.0, h) * 0.5, 0.0, 1.0));
       col *= c.ao;
       vec2 cg = c.g + forestGrad * 0.4 * forest.y;
@@ -581,11 +645,32 @@ void main() {
       albedo *= 1.0 - step(1e-4, sh.h) * 0.35 * treeVis;
       Blobs t = blobs(p, LONE_FREQ, 0.45, loose);
       if (t.h > 0.0) {
-        vec3 crown = mix(srgb(56.0, 108.0, 38.0), srgb(40.0, 84.0, 34.0), t.id) * mix(0.6, 1.15, t.rel);
+        vec3 crown = foliage(mix(srgb(56.0, 108.0, 38.0), srgb(40.0, 84.0, 34.0), t.id), fract(t.id * 7.3)) * mix(0.6, 1.15, t.rel);
         albedo = mix(albedo, crown, treeVis);
         N = normalize(mix(N, normalize(N + vec3(-t.g.x, 0.0, -t.g.y)), treeVis));
       }
     }
+
+    // Spring: wildflowers dotting the meadows, once they span a few pixels
+    float flowerVis = uSeason.x * smoothstep(0.1, 0.04, footprint);
+    if (flowerVis > 0.0) {
+      float meadow = (1.0 - fm) * (1.0 - crystal) * (1.0 - rockiness) * (1.0 - arid) * (1.0 - snow)
+        * smoothstep(0.3, 0.6, h) * (1.0 - smoothstep(0.2, 0.4, m.g))
+        * smoothstep(0.35, 0.65, noised(p * 0.09 + 23.0).x * 0.5 + 0.5);
+      vec2 q = p * 3.0;
+      ivec2 cell = ivec2(floor(q));
+      float bloom = smoothstep(0.18, 0.1, length(fract(q) - (hash22(cell) * 0.6 + 0.2)))
+        * step(hash21(cell + ivec2(41, 7)), meadow * 0.7);
+      float kind = hash21(cell + ivec2(3, 99));
+      vec3 petals = kind < 0.4 ? srgb(242.0, 238.0, 226.0) : kind < 0.75 ? srgb(240.0, 206.0, 70.0) : srgb(232.0, 150.0, 182.0);
+      albedo = mix(albedo, petals, bloom * flowerVis);
+    }
+
+    // Winter: snow on open ground; in woods it lies between the trees and on
+    // the upward-facing crowns
+    float crownSnow = uTexturedForest > 0.5 ? 0.85 : smoothstep(0.75, 0.97, N.y);
+    winterSnow *= mix(1.0, crownSnow, fm) * (1.0 - crystal);
+    albedo = mix(albedo, srgb(236.0, 240.0, 248.0), winterSnow);
 
     // Shade cast by woods onto open ground beside them
     float woodShadow = clamp(dot(forestGrad, L.xz) * 2.5, 0.0, 1.0) * (1.0 - smoothstep(0.0, 0.3, fm)) * (1.0 - crystal);
@@ -594,7 +679,7 @@ void main() {
     // Beaches
     float beachN = noised(p * 2.0).x * 0.05;
     float beach = (1.0 - smoothstep(0.08, 0.2, h + beachN)) * (1.0 - smoothstep(0.1, 0.3, slope));
-    albedo = mix(albedo, srgb(218.0, 204.0, 146.0), beach * 0.85);
+    albedo = mix(albedo, srgb(218.0, 204.0, 146.0), beach * 0.85 * (1.0 - winterSnow * 0.7));
 
     // Rivers and lakes, with banks frayed by noise once close
     float wm = m.g + noised(p * 1.3).x * 0.05 * smoothstep(0.6, 0.1, footprint);
@@ -607,10 +692,10 @@ void main() {
     albedo = mix(albedo, albedo * mix(vec3(0.75), vec3(0.9, 0.85, 0.7), arid), bank);
 
     float diff = max(dot(N, L), 0.0);
-    vec3 ambient = vec3(0.92, 0.96, 1.08) * (0.38 + 0.12 * N.y);
+    vec3 ambient = vec3(0.92, 0.96, 1.08) * mix(vec3(1.0), vec3(0.95, 0.98, 1.06), uSeason.w) * (0.38 + 0.12 * N.y);
     color = albedo * (ambient + diff * 0.95 * sun);
     // Glint on snow
-    color += sun * pow(max(dot(reflect(-L, N), V), 0.0), 20.0) * 0.12 * snow;
+    color += sun * pow(max(dot(reflect(-L, N), V), 0.0), 20.0) * 0.12 * max(snow, winterSnow);
     if (crystal > 0.0) {
       // Slow breathing light, and shards twinkling as the view moves
       float pulse = 0.7 + 0.3 * sin(uTime * 1.2 + noised(p * 0.06).x * 6.0);

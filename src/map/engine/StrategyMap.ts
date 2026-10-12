@@ -22,6 +22,8 @@ import { RoadHighlights, type RoadHighlight } from './RoadHighlights'
 import { RoadOverview } from './RoadOverview'
 import { CityHighlights, type CityHighlight } from './CityHighlights'
 import { MarchMarkers, type MarchOrder } from './MarchMarkers'
+import { SEASON_FADE, seasonWeights, type MapSeason } from './season'
+import { Snowfall } from './Snowfall'
 
 /** Vertical exaggeration of the macro elevation */
 const HEIGHT_SCALE = 1.4
@@ -53,6 +55,7 @@ export interface MapSettings {
   terrain?: TerrainSettings
   render?: RenderSettings
   places?: PlaceSettings
+  season?: MapSeason
 }
 
 /** Owns the three.js scene of the strategy map */
@@ -77,6 +80,12 @@ export class StrategyMap {
   private readonly marches: MarchMarkers
   private readonly heights: Heightfield
   private readonly parchment: ParchmentEffect
+  private readonly snowfall = new Snowfall()
+  /** The terrain's season weights, fading from `seasonFrom` to `seasonTo` as `seasonFade` runs 0 to 1 */
+  private readonly season: THREE.Vector4
+  private readonly seasonFrom = new THREE.Vector4()
+  private readonly seasonTo = new THREE.Vector4()
+  private seasonFade = 1
   private readonly macro: THREE.DataTexture
   private readonly flow: THREE.DataTexture
   private readonly resizeObserver: ResizeObserver
@@ -122,6 +131,7 @@ export class StrategyMap {
       maxHeight,
     })
     this.scene.add(this.terrain.mesh)
+    this.season = this.terrain.material.uniforms.uSeason.value
     this.forest = new Forest(world, this.terrain.material, HEIGHT_SCALE, this.renderer.capabilities.getMaxAnisotropy())
     this.forest.applySettings(normalizeForestSettings(settings.forest ?? FOREST_DEFAULTS))
     this.scene.add(this.forest.group)
@@ -145,6 +155,7 @@ export class StrategyMap {
     this.setPlaceSettings(settings.places ?? PLACE_DEFAULTS)
     this.parchment = new ParchmentEffect(this.renderer)
     this.parchment.applySettings(settings.parchment ?? PARCHMENT_DEFAULTS)
+    this.setSeason(settings.season ?? 'summer', true)
 
     const s = world.worldSize
     this.controls = new MapCameraController(this.camera, this.renderer.domElement, heights, HEIGHT_SCALE, {
@@ -298,13 +309,31 @@ export class StrategyMap {
     this.parchment.applySettings(settings)
   }
 
+  /** Changes the look of the land to a season; it fades in unless `instant` */
+  setSeason(season: MapSeason, instant = false) {
+    seasonWeights(season, this.seasonTo)
+    if (instant) {
+      this.season.copy(this.seasonTo)
+      this.seasonFade = 1
+    } else if (!this.season.equals(this.seasonTo)) {
+      this.seasonFrom.copy(this.season)
+      this.seasonFade = 0
+    }
+  }
+
   private frame = (now: number) => {
     const dt = Math.min(100, now - this.lastTime)
     this.lastTime = now
     this.controls.update(dt)
     this.terrain.update(this.camera)
     this.terrain.material.uniforms.uTime.value = now / 1000
-    const viewDistance = this.controls.getView().distance
+    if (this.seasonFade < 1) {
+      this.seasonFade = Math.min(1, this.seasonFade + dt / (SEASON_FADE * 1000))
+      const t = THREE.MathUtils.smoothstep(this.seasonFade, 0, 1)
+      this.season.lerpVectors(this.seasonFrom, this.seasonTo, t)
+    }
+    const view = this.controls.getView()
+    const viewDistance = view.distance
     const art = this.cities.update(viewDistance)
     this.labels.update(this.camera, this.viewSize.width, this.viewSize.height, this.pxScale, art)
     this.overlayUniforms.update(viewDistance)
@@ -314,6 +343,10 @@ export class StrategyMap {
     this.marches.update(dt, this.camera, this.viewSize.width, this.viewSize.height, this.pxScale)
     this.parchment.render(this.renderer, this.scene, this.camera)
     this.renderer.autoClear = false
+    const groundHeight = 2 * viewDistance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)
+    this.snowfall.update(now / 1000, this.season.w,
+      this.renderer.getPixelRatio(), view, groundHeight * this.camera.aspect, groundHeight)
+    if (this.snowfall.visible) this.renderer.render(this.snowfall.scene, this.camera)
     this.renderer.render(this.overlay, this.camera)
     this.renderer.autoClear = true
 
@@ -344,6 +377,7 @@ export class StrategyMap {
     this.cityHighlights.dispose()
     this.marches.dispose()
     this.parchment.dispose()
+    this.snowfall.dispose()
     this.macro.dispose()
     this.flow.dispose()
     this.renderer.dispose()

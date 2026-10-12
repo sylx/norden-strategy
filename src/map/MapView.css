@@ -83,6 +83,7 @@
 .map-controls button:hover { background: #465640; }
 .map-controls__presets { display: flex; gap: 6px; margin: 12px 0; }
 .map-controls__presets button { flex: 1; }
+.map-controls__presets button[aria-pressed="true"] { background: #5d7050; border-color: #a9b88f; }
 .map-controls fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .map-controls fieldset:disabled { opacity: 0.4; }
 .map-controls__slider { display: block; margin: 9px 0; }
