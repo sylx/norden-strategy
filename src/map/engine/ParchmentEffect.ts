@@ -25,6 +25,11 @@ uniform float uPaperScale;
 uniform float uFade;
 uniform float uVignette;
 uniform bool uGrade;
+// Heat shimmer over the desert (aridity in uFlow.b): strength, time
+uniform sampler2D uFlow;
+uniform float uWorldSize;
+uniform float uHeat;
+uniform float uTime;
 varying vec2 vUv;
 
 // Grading and ink/paper colours are in display space, as in battle's effect.
@@ -66,13 +71,33 @@ vec2 groundXZ(vec2 uv) {
   return mix(p0, p1, t).xz;
 }
 
+// Rising, wavering bands over hot sand: the picture sways sideways a pixel or
+// two. Returns the shifted uv and, in z, how hot the ground there is.
+vec3 heatShimmer(vec2 uv) {
+  if (uHeat <= 0.0) return vec3(uv, 0.0);
+  float hot = smoothstep(0.35, 0.65, texture2D(uFlow, groundXZ(uv) / uWorldSize).b) * uHeat;
+  if (hot <= 0.0) return vec3(uv, 0.0);
+  vec2 px = gl_FragCoord.xy / uPixelRatio;
+  float t = uTime;
+  float wave = sin(px.y * 0.35 - t * 4.0 + sin(px.x * 0.04 + t * 0.7) * 2.0)
+    + 0.5 * sin(px.y * 0.9 - t * 6.3 + px.x * 0.02);
+  // Gusts: the shimmer comes and goes across the sand
+  float gust = 0.55 + 0.45 * sin(px.x * 0.006 + px.y * 0.004 - t * 0.5);
+  vec2 shift = vec2(wave, 0.3 * sin(px.x * 0.2 + t * 3.1)) * 1.1 * hot * gust;
+  return vec3(uv + shift * uPixelRatio / uResolution, hot);
+}
+
 void main() {
+  vec3 heat = heatShimmer(vUv);
+  vec2 uv = heat.xy;
   if (!uGrade) {
-    gl_FragColor = linearToOutputTexel(vec4(texture2D(tColor, vUv).rgb, 1));
+    gl_FragColor = linearToOutputTexel(vec4(texture2D(tColor, uv).rgb, 1));
     return;
   }
   // The map is already lit; no second ACES tone map is applied here.
-  vec3 base = clamp(linearToOutputTexel(vec4(texture2D(tColor, vUv).rgb * uExposure, 1)).rgb, 0.0, 1.0);
+  vec3 base = clamp(linearToOutputTexel(vec4(texture2D(tColor, uv).rgb * uExposure, 1)).rgb, 0.0, 1.0);
+  // A pale glare hangs over the hot sand
+  base = mix(base, vec3(1.0, 0.96, 0.86), heat.z * 0.06);
   float l = dot(base, vec3(0.299, 0.587, 0.114));
   vec3 col = mix(vec3(l), base, uSaturation);
   col = mix(col, mix(INK, PAPER, smoothstep(0.02, 0.95, l)), uSepia);
@@ -131,6 +156,7 @@ export class ParchmentEffect {
         uExposure: { value: 1 }, uSaturation: { value: 1 }, uSepia: { value: 0 },
         uPaper: { value: 0 }, uPaperScale: { value: 48 }, uFade: { value: 0 },
         uVignette: { value: 0 }, uGrade: { value: true },
+        uFlow: { value: null }, uWorldSize: { value: 1 }, uHeat: { value: 0 }, uTime: { value: 0 },
       },
     })
     this.quad = new FullScreenQuad(this.material)
@@ -148,6 +174,18 @@ export class ParchmentEffect {
     u.uPaperScale.value = settings.paperScale
     u.uFade.value = settings.fade
     u.uVignette.value = settings.vignette
+  }
+
+  /** The world's flow texture, whose aridity places the heat shimmer */
+  setWorld(flow: THREE.Texture, worldSize: number) {
+    this.material.uniforms.uFlow.value = flow
+    this.material.uniforms.uWorldSize.value = worldSize
+  }
+
+  /** Strength of the heat shimmer over the desert (0 for none), and the time in seconds */
+  setHeat(strength: number, time: number) {
+    this.material.uniforms.uHeat.value = strength
+    this.material.uniforms.uTime.value = time
   }
 
   setMultisample(enabled: boolean) {
