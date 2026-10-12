@@ -65,6 +65,7 @@ uniform float uFixedPx;
 uniform vec2 uAnchor;
 out vec2 vUv;
 out float vDistance;
+out float vPx;
 void main() {
   // The mesh position carries the city's ground point
   vec2 p = vec2(modelMatrix[3][0], modelMatrix[3][2]);
@@ -78,6 +79,7 @@ void main() {
   gl_Position = projectionMatrix * corner;
   vUv = uv;
   vDistance = length(center.xyz);
+  vPx = px;
 }
 `
 
@@ -87,11 +89,42 @@ uniform float uAlpha;
 uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
+uniform float uOutline;
 in vec2 vUv;
 in float vDistance;
+in float vPx;
 out vec4 fragColor;
+
+// The art's solid part grown by r (uv), from samples in a ring around the point
+float grown(float r) {
+  float a = 0.0;
+  for (int i = 0; i < 12; i++) {
+    float ang = float(i) * 0.5235988;
+    a = max(a, texture(uMap, vUv + vec2(cos(ang), sin(ang)) * r).a);
+  }
+  // Soft shadows painted into the art do not count as solid
+  return smoothstep(0.25, 0.6, a);
+}
+
+// src drawn over dst (straight alpha)
+vec4 over(vec4 src, vec4 dst) {
+  float a = src.a + dst.a * (1.0 - src.a);
+  return vec4((src.rgb * src.a + dst.rgb * dst.a * (1.0 - src.a)) / max(a, 1e-4), a);
+}
+
 void main() {
   vec4 texel = texture(uMap, vUv);
+  // A dark ink line hugging the art and a pale glow beyond it, a fixed number
+  // of screen pixels wide, so the cities stand out on snow and dark woods alike
+  if (uOutline > 0.0) {
+    // On small cards the rim narrows with the art instead of swallowing it
+    float px = min(1.0 / max(vPx, 1.0), 0.02);
+    float ink = grown(1.6 * px);
+    float glow = max(grown(3.2 * px), grown(4.8 * px) * 0.5);
+    vec4 rim = over(vec4(0.02, 0.012, 0.006, ink * 0.9), vec4(0.95, 0.87, 0.68, glow * 0.6));
+    rim.a *= uOutline;
+    texel = over(texel, rim);
+  }
   texel.a *= uAlpha;
   if (texel.a < 0.01) discard;
   // Only a touch of fog: the cities are game pieces and should stay legible
@@ -124,6 +157,7 @@ export class Cities {
     uMinPx: { value: PLACE_DEFAULTS.cityMinPx },
     uMaxPx: { value: PLACE_DEFAULTS.cityMaxPx },
     uPxScale: { value: 1 },
+    uOutline: { value: PLACE_DEFAULTS.outline },
   }
   private readonly artAlpha = { value: 1 }
   private readonly emblemAlpha = { value: 0 }
@@ -240,6 +274,7 @@ export class Cities {
     this.shared.uMinPx.value = settings.cityMinPx
     this.shared.uMaxPx.value = settings.cityMaxPx
     this.emblemPx.value = settings.emblemPx
+    this.shared.uOutline.value = settings.outline
   }
 
   /**
