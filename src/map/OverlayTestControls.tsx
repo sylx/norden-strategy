@@ -9,7 +9,7 @@ import { FACTION_LIST } from '../data/faction'
 /** Test colours per faction until the faction data carries its own */
 const FACTION_COLORS: Readonly<Record<string, string>> = {
   valhardt: '#3d5fa8',
-  dracken: '#b0342c',
+  nordis: '#b0342c',
   leonis: '#d0a326',
   carta: '#4f8a63',
   aqua: '#2f93ad',

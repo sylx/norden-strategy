@@ -232,7 +232,7 @@ export const CITY_LIST: City[] = [
     "agriculture": 140,
     "market": 560,
     "military": 220,
-    "belongTo": "dracken"
+    "belongTo": "nordis"
   },
   {
     "id": "P018",
@@ -257,7 +257,7 @@ export const CITY_LIST: City[] = [
     "market": 100,
     "military": 240,
     "special": "未知領域への入口",
-    "belongTo": "dracken"
+    "belongTo": "nordis"
   },
   {
     "id": "P020",
@@ -269,7 +269,7 @@ export const CITY_LIST: City[] = [
     "agriculture": 140,
     "market": 160,
     "military": 460,
-    "belongTo": "dracken"
+    "belongTo": "nordis"
   },
   {
     "id": "P021",
@@ -358,7 +358,7 @@ export const CITY_LIST: City[] = [
     "market": 240,
     "military": 140,
     "special": "魔法師ギルド本部",
-    "belongTo": "dracken"
+    "belongTo": "nordis"
   },
   {
     "id": "P028",
