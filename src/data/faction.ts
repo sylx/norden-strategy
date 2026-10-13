@@ -16,7 +16,7 @@ export const FACTION_LIST = [
   },
   {
     id: "dracken",
-    name: "ドラーケン家",
+    name: "ノルディス家",
     emblem: 3,
     patriarchLabel: "当主"
   },
