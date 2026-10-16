@@ -1,17 +1,25 @@
 import type { Faction } from "./faction"
 
+/**
+ * A city as the map draws it. The same data as the game's src/data/cityData.json
+ * (nordencult, written by norden-data's city editor) with the map's own image;
+ * keep them in step (the game's tests compare them). The game's state, not this,
+ * holds what changes turn by turn.
+ */
 export interface City {
   id: string
   name: string
   nameEn: string
-  type: string,
+  type: string
+  /** The picture drawn for it; omitted: chosen by population */
   image?: "town" | "city" | "metropolice" | "fortress1" | "fortress2" | "temple"
   tags: string[]
+  /** Population at the start */
   population: number
-  agriculture: number
+  /** 商業・生産 at the start */
   market: number
-  military: number
-  special?: string,
+  production: number
+  special?: string
   belongTo?: Faction['id']
 }
 
@@ -24,9 +32,8 @@ export const CITY_LIST: City[] = [
     "image": "temple",
     "tags": ["遺跡", "聖地", "中立"],
     "population": 12000,
-    "agriculture": 80,
     "market": 400,
-    "military": 0,
+    "production": 0,
     "belongTo": "sede"
   },
   {
@@ -36,9 +43,8 @@ export const CITY_LIST: City[] = [
     "type": "port_city",
     "tags": ["港湾", "西方", "漁港"],
     "population": 9000,
-    "agriculture": 200,
     "market": 380,
-    "military": 250,
+    "production": 250,
     "belongTo": "taurus"
   },
   {
@@ -48,9 +54,8 @@ export const CITY_LIST: City[] = [
     "type": "farm_city",
     "tags": ["農地", "南方", "果樹"],
     "population": 7000,
-    "agriculture": 480,
     "market": 160,
-    "military": 160,
+    "production": 160,
     "belongTo": "taurus"
   },
   {
@@ -60,9 +65,8 @@ export const CITY_LIST: City[] = [
     "type": "farm_city",
     "tags": ["農地", "河川", "氾濫原"],
     "population": 8000,
-    "agriculture": 560,
     "market": 160,
-    "military": 140,
+    "production": 140,
     "belongTo": "leonis"
   },
   {
@@ -72,9 +76,8 @@ export const CITY_LIST: City[] = [
     "type": "farm_city",
     "tags": ["農地", "牧畜", "軍馬"],
     "population": 8000,
-    "agriculture": 560,
     "market": 160,
-    "military": 220,
+    "production": 220,
     "belongTo": "leonis"
   },
   {
@@ -84,9 +87,8 @@ export const CITY_LIST: City[] = [
     "type": "farm_city",
     "tags": ["農地", "穀倉", "灌漑"],
     "population": 9000,
-    "agriculture": 600,
     "market": 160,
-    "military": 220,
+    "production": 220,
     "belongTo": "leonis"
   },
   {
@@ -96,9 +98,8 @@ export const CITY_LIST: City[] = [
     "type": "farm_city",
     "tags": ["農地", "南方", "塩田"],
     "population": 10000,
-    "agriculture": 440,
     "market": 260,
-    "military": 220,
+    "production": 220,
     "belongTo": "rosalia"
   },
   {
@@ -108,9 +109,8 @@ export const CITY_LIST: City[] = [
     "type": "port_city",
     "tags": ["港湾", "南東", "深海"],
     "population": 8000,
-    "agriculture": 140,
     "market": 380,
-    "military": 220,
+    "production": 220,
     "belongTo": "rosalia"
   },
   {
@@ -120,9 +120,8 @@ export const CITY_LIST: City[] = [
     "type": "ruin_city",
     "tags": ["遺跡", "ゴーレム", "禁忌"],
     "population": 10000,
-    "agriculture": 140,
     "market": 160,
-    "military": 140,
+    "production": 140,
     "special": "ゴーレム遺跡",
     "belongTo": "rosalia"
   },
@@ -133,9 +132,8 @@ export const CITY_LIST: City[] = [
     "type": "port_city",
     "tags": ["港湾", "東岸", "海賊"],
     "population": 15000,
-    "agriculture": 120,
     "market": 560,
-    "military": 280,
+    "production": 280,
     "belongTo": "aqua"
   },
   {
@@ -145,9 +143,8 @@ export const CITY_LIST: City[] = [
     "type": "farm_city",
     "tags": ["農地", "中央", "河川"],
     "population": 12000,
-    "agriculture": 640,
     "market": 240,
-    "military": 220,
+    "production": 220,
     "belongTo": "leonis"
   },
   {
@@ -157,9 +154,8 @@ export const CITY_LIST: City[] = [
     "type": "trade_city",
     "tags": ["交差路", "中東", "市場"],
     "population": 11000,
-    "agriculture": 220,
     "market": 460,
-    "military": 220,
+    "production": 220,
     "belongTo": "leonis"
   },
   {
@@ -167,11 +163,10 @@ export const CITY_LIST: City[] = [
     "name": "フルーエン",
     "nameEn": "Fluen",
     "type": "port_city",
-    "tags": ["港湾", "西岸", "河川"],
-    "population": 11000,
-    "agriculture": 220,
+    "tags": ["港湾", "河川"],
+    "population": 12400,
     "market": 440,
-    "military": 220,
+    "production": 220,
     "belongTo": "carta"
   },
   {
@@ -181,9 +176,8 @@ export const CITY_LIST: City[] = [
     "type": "military_city",
     "tags": ["要害", "北中央", "十字路"],
     "population": 10000,
-    "agriculture": 220,
     "market": 240,
-    "military": 460,
+    "production": 460,
     "belongTo": "leonis"
   },
   {
@@ -193,9 +187,8 @@ export const CITY_LIST: City[] = [
     "type": "trade_city",
     "tags": ["交差路", "中西", "大市場"],
     "population": 20000,
-    "agriculture": 220,
     "market": 720,
-    "military": 280,
+    "production": 280,
     "belongTo": "leonis"
   },
   {
@@ -205,9 +198,8 @@ export const CITY_LIST: City[] = [
     "type": "farm_city",
     "tags": ["農地", "中央", "学術"],
     "population": 10000,
-    "agriculture": 460,
     "market": 260,
-    "military": 140,
+    "production": 140,
     "belongTo": "leonis"
   },
   {
@@ -217,9 +209,8 @@ export const CITY_LIST: City[] = [
     "type": "frontier_city",
     "tags": ["北西", "交易路", "木材"],
     "population": 5000,
-    "agriculture": 240,
     "market": 240,
-    "military": 300,
+    "production": 300,
     "belongTo": "valhardt"
   },
   {
@@ -229,9 +220,8 @@ export const CITY_LIST: City[] = [
     "type": "trade_city",
     "tags": ["交差路", "北東", "大市場"],
     "population": 14000,
-    "agriculture": 140,
     "market": 560,
-    "military": 220,
+    "production": 220,
     "belongTo": "nordis"
   },
   {
@@ -241,9 +231,8 @@ export const CITY_LIST: City[] = [
     "type": "ruin_city",
     "tags": ["遺跡", "北東", "古代研究"],
     "population": 4000,
-    "agriculture": 140,
     "market": 180,
-    "military": 140,
+    "production": 140,
     "belongTo": "leonis"
   },
   {
@@ -253,9 +242,8 @@ export const CITY_LIST: City[] = [
     "type": "frontier_city",
     "tags": ["最北東", "岬", "未知の地"],
     "population": 3000,
-    "agriculture": 120,
     "market": 100,
-    "military": 240,
+    "production": 240,
     "special": "未知領域への入口",
     "belongTo": "nordis"
   },
@@ -266,9 +254,8 @@ export const CITY_LIST: City[] = [
     "type": "military_city",
     "tags": ["要害", "北方", "関所"],
     "population": 7000,
-    "agriculture": 140,
     "market": 160,
-    "military": 460,
+    "production": 460,
     "belongTo": "nordis"
   },
   {
@@ -278,9 +265,8 @@ export const CITY_LIST: City[] = [
     "type": "military_city",
     "tags": ["要害", "最北", "山岳"],
     "population": 8000,
-    "agriculture": 140,
     "market": 160,
-    "military": 560,
+    "production": 560,
     "belongTo": "valhardt"
   },
   {
@@ -290,9 +276,8 @@ export const CITY_LIST: City[] = [
     "type": "port_city",
     "tags": ["港湾", "東岸", "海上交易"],
     "population": 18000,
-    "agriculture": 140,
     "market": 660,
-    "military": 280,
+    "production": 280,
     "belongTo": "aqua"
   },
   {
@@ -302,11 +287,10 @@ export const CITY_LIST: City[] = [
     "type": "ruin_city",
     "tags": ["遺跡", "中央", "鍛冶"],
     "population": 5000,
-    "agriculture": 80,
     "market": 240,
-    "military": 240,
+    "production": 240,
     "special": "旧帝国鍛冶遺跡",
-    "belongTo": "leonis" 
+    "belongTo": "leonis"
   },
   {
     "id": "P024",
@@ -316,9 +300,8 @@ export const CITY_LIST: City[] = [
     "image": "fortress1",
     "tags": ["要害", "中東", "騎士団"],
     "population": 9000,
-    "agriculture": 140,
     "market": 160,
-    "military": 640,
+    "production": 640,
     "special": "誓約騎士団の本拠地",
     "belongTo": "leonis"
   },
@@ -330,9 +313,8 @@ export const CITY_LIST: City[] = [
     "image": "fortress1",
     "tags": ["要害", "中央北", "岩山"],
     "population": 7000,
-    "agriculture": 60,
     "market": 140,
-    "military": 560,
+    "production": 560,
     "belongTo": "leonis"
   },
   {
@@ -342,9 +324,8 @@ export const CITY_LIST: City[] = [
     "type": "frontier_city",
     "tags": ["森林", "西方", "狩人"],
     "population": 4000,
-    "agriculture": 240,
     "market": 160,
-    "military": 300,
+    "production": 300,
     "belongTo": "carta"
   },
   {
@@ -354,9 +335,8 @@ export const CITY_LIST: City[] = [
     "type": "ruin_city",
     "tags": ["魔法", "北方", "魔法師ギルド"],
     "population": 6000,
-    "agriculture": 80,
     "market": 240,
-    "military": 140,
+    "production": 140,
     "special": "魔法師ギルド本部",
     "belongTo": "nordis"
   },
@@ -367,9 +347,8 @@ export const CITY_LIST: City[] = [
     "type": "frontier_city",
     "tags": ["辺境", "北西", "鉱山"],
     "population": 5000,
-    "agriculture": 140,
     "market": 240,
-    "military": 300,
+    "production": 300,
     "belongTo": "valhardt"
   },
   {
@@ -377,12 +356,11 @@ export const CITY_LIST: City[] = [
     "name": "ヘクサリア",
     "nameEn": "Hexalia",
     "type": "ruin_city",
-    "tags": ["魔法", "北中央", "禁忌"],
     "image": "fortress2",
+    "tags": ["魔法", "北中央", "禁忌"],
     "population": 3000,
-    "agriculture": 120,
     "market": 80,
-    "military": 140,
+    "production": 140,
     "special": "禁忌魔法の発生源",
     "belongTo": "valhardt"
   },
@@ -393,12 +371,10 @@ export const CITY_LIST: City[] = [
     "type": "military_city",
     "tags": ["要害", "西端", "断崖"],
     "population": 6000,
-    "agriculture": 80,
     "market": 140,
-    "military": 460,
+    "production": 460,
     "belongTo": "taurus"
   }
-
 ]
 
 export const CITY_MAP: Record<string, City> = CITY_LIST.reduce((acc, city) => {
