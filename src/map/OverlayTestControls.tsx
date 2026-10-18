@@ -3,7 +3,7 @@ import type { StrategyMap } from './engine/StrategyMap'
 import type { CityHighlight } from './engine/CityHighlights'
 import type { RoadHighlight } from './engine/RoadHighlights'
 import { MARCH_KINDS, type MarchKind } from './engine/MarchMarkers'
-import { PLACES, ROAD_LINKS } from './world/placeLayout'
+import { ROAD_LINKS } from './world/placeLayout'
 import { FACTION_LIST } from '../data/faction'
 
 /** Test colours per faction until the faction data carries its own */
@@ -21,9 +21,6 @@ const NEUTRAL_COLOR = '#8a8a80'
 const NEIGHBOUR_COLOR = '#7fc4ff'
 const ROAD_COLOR = '#ff8a4a'
 
-const PLACE_NAMES = new Map(PLACES.map((p) => [p.id, p.name]))
-const placeName = (id: string) => `${id} ${PLACE_NAMES.get(id) ?? ''}`
-const factionColor = (id: string) => FACTION_COLORS[PLACES.find((p) => p.id === id)?.belongTo ?? ''] ?? NEUTRAL_COLOR
 
 interface Props {
   map: StrategyMap | null
@@ -47,6 +44,11 @@ export function OverlayTestControls({ map, selected, onSelect }: Props) {
   const [status, setStatus] = useState('')
   const [marching, setMarching] = useState(0)
   const serial = useRef(0)
+  // The cities the map draws
+  const places = map?.places ?? []
+  const nameOf = (id: string) => places.find((p) => p.id === id)?.name ?? ''
+  const placeName = (id: string) => `${id} ${nameOf(id)}`
+  const factionColor = (id: string) => FACTION_COLORS[places.find((p) => p.id === id)?.belongTo ?? ''] ?? NEUTRAL_COLOR
 
   useEffect(() => {
     if (!map) return
@@ -96,7 +98,7 @@ export function OverlayTestControls({ map, selected, onSelect }: Props) {
   }
 
   const marchRandom = () => {
-    const ids = PLACES.map((p) => p.id)
+    const ids = places.map((p) => p.id)
     const kinds = Object.keys(MARCH_KINDS) as MarchKind[]
     const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]
     let started = 0
@@ -117,7 +119,7 @@ export function OverlayTestControls({ map, selected, onSelect }: Props) {
     setStatus('全部隊を消去しました')
   }
 
-  const cityOptions = PLACES.map((p) => <option key={p.id} value={p.id}>{placeName(p.id)}</option>)
+  const cityOptions = places.map((p) => <option key={p.id} value={p.id}>{placeName(p.id)}</option>)
 
   return (
     <details className="map-controls__panel" name="map-appearance">
@@ -151,7 +153,7 @@ export function OverlayTestControls({ map, selected, onSelect }: Props) {
           <select value={road} onChange={e => setRoad(e.target.value)}>
             <option value="">（なし）</option>
             {ROAD_LINKS.map(([a, b]) => (
-              <option key={`${a}-${b}`} value={`${a}-${b}`}>{PLACE_NAMES.get(a)} – {PLACE_NAMES.get(b)}</option>
+              <option key={`${a}-${b}`} value={`${a}-${b}`}>{nameOf(a)} – {nameOf(b)}</option>
             ))}
           </select>
         </label>
@@ -164,7 +166,7 @@ export function OverlayTestControls({ map, selected, onSelect }: Props) {
         <label className="map-controls__field">
           <span>出発地</span>
           <select value={from} onChange={e => setFrom(e.target.value)}>
-            <option value="">選択中の都市{selected ? `（${PLACE_NAMES.get(selected)}）` : ''}</option>
+            <option value="">選択中の都市{selected ? `（${nameOf(selected)}）` : ''}</option>
             {cityOptions}
           </select>
         </label>

@@ -4,8 +4,10 @@
  * Coordinates use the same 8192px image space as islandDesign.ts. Move a
  * city by editing its position here: the ground under it is levelled and its
  * roads are routed again over the terrain when the world is generated.
+ *
+ * What the cities are (names, pictures, factions) is not kept here: the app
+ * embedding the map gives them (MapView's `cities`), the map on its own uses SAMPLE_CITIES.
  */
-import { CITY_LIST, type City } from '../../data/city'
 import { IMAGE_TO_WORLD, type Vec2 } from './islandDesign'
 
 export type PlaceType = 'town' | 'city' | 'metropolice' | 'fortress1' | 'fortress2' | 'temple'
@@ -71,29 +73,38 @@ export const PLACE_KINDS: Readonly<Record<PlaceType, { size: number; radius: num
   temple: { size: 2, radius: 8 },
 }
 
-export interface Place {
+/** A city as the app embedding the map gives it: its name, its picture and the faction holding it (its emblem) */
+export interface MapCity {
+  /** One of PLACE_POSITIONS' ids; a city without a position is not drawn */
   id: string
   name: string
   type: PlaceType
+  /** Omitted: neutral */
   belongTo?: string
+}
+
+/** A city placed on the map */
+export interface Place extends MapCity {
   /** World units */
   x: number
   z: number
 }
 
-function placeType(city: City): PlaceType {
-  if (city.image) return city.image
-  if (city.population >= 15000) return 'metropolice'
-  if (city.population >= 8000) return 'city'
-  return 'town'
+/** Position of each city in world units */
+export const PLACE_POINTS: Readonly<Record<string, { x: number; z: number }>> = Object.fromEntries(
+  Object.entries(PLACE_POSITIONS).map(([id, [x, z]]) => [id, { x: x * IMAGE_TO_WORLD, z: z * IMAGE_TO_WORLD }]),
+)
+
+/** The cities that have a position, placed (the others are left out) */
+export function placesOf(cities: readonly MapCity[]): Place[] {
+  return cities.flatMap((city) => {
+    const point = PLACE_POINTS[city.id]
+    return point ? [{ ...city, ...point }] : []
+  })
 }
 
-/** Cities that have a position, in world units */
-export const PLACES: readonly Place[] = CITY_LIST.flatMap((city) => {
-  const pos = PLACE_POSITIONS[city.id]
-  if (!pos) return []
-  return [{
-    id: city.id, name: city.name, type: placeType(city), belongTo: city.belongTo,
-    x: pos[0] * IMAGE_TO_WORLD, z: pos[1] * IMAGE_TO_WORLD,
-  }]
+/** Stand-ins for the map on its own: every position, named by its id, showing each kind of picture in turn */
+export const SAMPLE_CITIES: readonly MapCity[] = Object.keys(PLACE_POSITIONS).map((id, i) => {
+  const types = Object.keys(PLACE_KINDS) as PlaceType[]
+  return { id, name: id, type: types[i % types.length] }
 })

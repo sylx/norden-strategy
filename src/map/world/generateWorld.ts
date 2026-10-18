@@ -27,7 +27,7 @@ import {
   WORLD_SIZE,
   type Vec2,
 } from './islandDesign'
-import { PLACE_KINDS, PLACES, ROAD_LINKS } from './placeLayout'
+import { PLACE_KINDS, ROAD_LINKS, type Place } from './placeLayout'
 import { planRoads, type RoadPath } from './roads'
 
 export interface WorldData {
@@ -37,15 +37,20 @@ export interface WorldData {
   macro: Float32Array
   /** RGBA, same layout as macro */
   flow: Float32Array
-  /** Roads between the cities of placeLayout.ts */
+  /** Roads between the cities (GenerateOptions.places) along placeLayout.ts' links */
   roads: RoadPath[]
   /** Problems with the city layout (cities on water, unreachable links) */
   warnings: string[]
 }
 
+/** What the world generation needs of a city: where it is and how large its picture is (the ground levelled and cleared under it) */
+export type WorldPlace = Pick<Place, 'id' | 'name' | 'type' | 'x' | 'z'>
+
 export interface GenerateOptions {
   resolution?: number
   seed?: number
+  /** The cities: the ground under them is levelled and cleared, and the roads join them */
+  places?: readonly WorldPlace[]
 }
 
 const SEA_FLOOR = -40
@@ -138,7 +143,7 @@ class CellHeap {
   }
 }
 
-export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOptions = {}): WorldData {
+export function generateWorld({ resolution = 1024, seed = 1337, places = [] }: GenerateOptions = {}): WorldData {
   const RES = resolution
   const cell = WORLD_SIZE / RES
   const n = createNoise2D(seed)
@@ -289,7 +294,7 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
 
   // --- 2b. Level the ground under the cities --------------------------------
   // Before drainage, so rivers find their way across the levelled ground.
-  for (const place of PLACES) {
+  for (const place of places) {
     const r = PLACE_KINDS[place.type].radius
     const ci = place.x / cell - 0.5
     const cj = place.z / cell - 0.5
@@ -458,7 +463,7 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
   for (let k = 0; k < N; k++) lake[k] = isLake(k) ? 1 : 0
   const { roads, warnings } = planRoads(
     { resolution: RES, cell, elev, water, lake, mountain },
-    PLACES,
+    places,
     ROAD_LINKS,
   )
 
@@ -469,7 +474,7 @@ export function generateWorld({ resolution = 1024, seed = 1337 }: GenerateOption
       clear[k] = Math.min(clear[k], smoothstep(inner, outer, d * cell))
     })
   }
-  for (const place of PLACES) {
+  for (const place of places) {
     const r = PLACE_KINDS[place.type].radius
     clearDisc(place.x, place.z, r * 0.9, r * 1.5)
   }

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { Heightfield } from '../world/Heightfield'
-import type { Place } from '../world/placeLayout'
+import type { Place, PlaceType } from '../world/placeLayout'
 import { cardPixels, emblemUrl, PLACE_ART } from './Cities'
 import { PLACE_DEFAULTS, type PlaceSettings } from './placeSettings'
 import './PlaceLabels.css'
@@ -37,6 +37,14 @@ export class PlaceLabels {
       return label
     })
     container.append(this.layer)
+  }
+
+  /** Changes the pictures of the cities (the names go under them); cities not listed keep theirs */
+  setTypes(types: Readonly<Record<string, PlaceType>>) {
+    for (const label of this.labels) {
+      const type = types[label.place.id]
+      if (type && type !== label.place.type) label.place = { ...label.place, type }
+    }
   }
 
   /** Changes the factions the cities belong to (the emblem beside the name); cities not listed keep theirs */

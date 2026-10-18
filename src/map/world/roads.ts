@@ -52,7 +52,7 @@ const DL = [1, 1, 1, 1, Math.SQRT2, Math.SQRT2, Math.SQRT2, Math.SQRT2]
 
 export function planRoads(
   terrain: RoadTerrain,
-  places: readonly Place[],
+  places: readonly Pick<Place, 'id' | 'name' | 'x' | 'z'>[],
   links: readonly (readonly [string, string])[],
 ): { roads: RoadPath[]; warnings: string[] } {
   const { resolution: RES, cell } = terrain

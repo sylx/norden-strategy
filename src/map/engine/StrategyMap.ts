@@ -10,7 +10,7 @@ import { ParchmentEffect } from './ParchmentEffect'
 import { PARCHMENT_DEFAULTS, type ParchmentSettings } from './parchmentSettings'
 import { normalizeTerrainSettings, TERRAIN_DEFAULTS, type TerrainSettings } from './terrainSettings'
 import { MAX_PIXEL_RATIO, normalizeRenderSettings, RENDER_DEFAULTS, type RenderSettings } from './renderSettings'
-import { PLACES } from '../world/placeLayout'
+import { placesOf, type MapCity, type Place, type PlaceType } from '../world/placeLayout'
 import { IMAGE_TO_WORLD } from '../world/islandDesign'
 import { Roads } from './Roads'
 import { Cities } from './Cities'
@@ -77,6 +77,9 @@ export class StrategyMap {
   private readonly roadOverview: RoadOverview
   private readonly roadHighlights: RoadHighlights
   private readonly cityHighlights: CityHighlights
+  private cityHighlightList: readonly CityHighlight[] = []
+  /** The cities drawn, with their pictures and factions as they are now */
+  private placeList: Place[]
   private readonly marches: MarchMarkers
   private readonly heights: Heightfield
   private readonly parchment: ParchmentEffect
@@ -101,8 +104,10 @@ export class StrategyMap {
   onStats?: (stats: MapStats) => void
   private readonly arrivalListeners = new Set<(id: string) => void>()
 
-  constructor(container: HTMLElement, world: WorldData, settings: MapSettings = {}) {
+  /** `cities`: those drawn (the ones with a position); later changes to their pictures and factions come by setCities */
+  constructor(container: HTMLElement, world: WorldData, cities: readonly MapCity[], settings: MapSettings = {}) {
     this.container = container
+    this.placeList = placesOf(cities)
     // Antialiasing comes from the multisampled scene target (ParchmentEffect)
     this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' })
     this.renderer.setClearColor(0x10264a)
@@ -139,15 +144,15 @@ export class StrategyMap {
     this.scene.add(this.crystals.mesh)
     this.roads = new Roads(world.roads, this.terrain.material, maxHeight)
     this.scene.add(this.roads.mesh)
-    this.cities = new Cities(PLACES, this.terrain.material, heights, HEIGHT_SCALE,
+    this.cities = new Cities(this.placeList, this.terrain.material, heights, HEIGHT_SCALE,
       this.renderer.capabilities.getMaxAnisotropy())
     this.overlay.add(this.cities.group)
-    this.labels = new PlaceLabels(container, PLACES, heights, HEIGHT_SCALE)
+    this.labels = new PlaceLabels(container, this.placeList, heights, HEIGHT_SCALE)
     this.network = new RoadNetwork(world.roads)
     this.overlayUniforms = new OverlayUniforms(this.terrain.material)
     this.roadOverview = new RoadOverview(world.roads, this.overlayUniforms)
     this.roadHighlights = new RoadHighlights(this.network, this.overlayUniforms)
-    this.cityHighlights = new CityHighlights(PLACES, this.overlayUniforms)
+    this.cityHighlights = new CityHighlights(this.placeList, this.overlayUniforms)
     this.marches = new MarchMarkers(container, this.overlayUniforms, heights, HEIGHT_SCALE,
       this.renderer.capabilities.getMaxAnisotropy())
     this.marches.onArrive = (id) => { for (const listener of this.arrivalListeners) listener(id) }
@@ -225,17 +230,42 @@ export class StrategyMap {
     this.labels.applySettings(settings)
   }
 
+  /** The cities drawn, as they are now */
+  get places(): readonly Place[] {
+    return this.placeList
+  }
+
   /**
-   * Changes the factions the cities belong to: their emblems on the map and
-   * beside their names. Cities not listed keep theirs; undefined is neutral.
+   * Changes the cities' factions (their emblems on the map and beside their names; undefined is neutral)
+   * and pictures (e.g. a larger one as the city grows, with its name and selection ring). Cities not listed
+   * keep theirs, and cities not drawn from the start are not added; the ground under them stays as it was generated
    */
-  setCityOwners(owners: Readonly<Record<string, string | undefined>>) {
-    this.cities.setOwners(owners)
-    this.labels.setOwners(owners)
+  setCities(cities: readonly MapCity[]) {
+    const byId = new Map(cities.map((city) => [city.id, city]))
+    const owners: Record<string, string | undefined> = {}
+    const types: Record<string, PlaceType> = {}
+    this.placeList = this.placeList.map((place) => {
+      const city = byId.get(place.id)
+      if (!city || (city.belongTo === place.belongTo && city.type === place.type)) return place
+      if (city.belongTo !== place.belongTo) owners[place.id] = city.belongTo
+      if (city.type !== place.type) types[place.id] = city.type
+      return { ...place, belongTo: city.belongTo, type: city.type }
+    })
+    if (Object.keys(owners).length > 0) {
+      this.cities.setOwners(owners)
+      this.labels.setOwners(owners)
+    }
+    if (Object.keys(types).length > 0) {
+      this.cities.setTypes(types)
+      this.labels.setTypes(types)
+      this.cityHighlights.setTypes(types)
+      this.cityHighlights.set(this.cityHighlightList)
+    }
   }
 
   /** Selection rings under these cities (and their names drawn as selected) */
   setCityHighlights(highlights: readonly CityHighlight[]) {
+    this.cityHighlightList = highlights
     this.cityHighlights.set(highlights)
     this.labels.setHighlighted(new Set(highlights.map((h) => h.id)))
   }
@@ -282,7 +312,7 @@ export class StrategyMap {
     const p = new THREE.Vector3()
     let best: string | null = null
     let bestD = Infinity
-    for (const place of PLACES) {
+    for (const place of this.placeList) {
       p.set(place.x, this.heights.surfaceAt(place.x, place.z) * HEIGHT_SCALE, place.z)
       const depth = -p.clone().applyMatrix4(this.camera.matrixWorldInverse).z
       if (depth <= 0) continue
@@ -300,7 +330,7 @@ export class StrategyMap {
 
   /** Moves the camera over a city, keeping the zoom; glides there unless `instant` */
   focusPlace(id: string, instant = false) {
-    const place = PLACES.find((p) => p.id === id)
+    const place = this.placeList.find((p) => p.id === id)
     if (!place) return
     if (instant) this.controls.setView(place.x, place.z, this.controls.getView().distance)
     else this.controls.panTo(place.x, place.z)

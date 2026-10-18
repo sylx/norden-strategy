@@ -15,7 +15,7 @@ import { SettingsExport } from './SettingsExport'
 import { OverlayTestControls } from './OverlayTestControls'
 import { SeasonControls } from './SeasonControls'
 import type { MapSeason } from './engine/season'
-import { PLACE_POSITIONS, PLACES } from './world/placeLayout'
+import { PLACE_POSITIONS, placesOf, SAMPLE_CITIES, type MapCity } from './world/placeLayout'
 import './MapView.css'
 
 declare global {
@@ -34,14 +34,18 @@ export interface MapViewProps {
   showControls?: boolean
   /** The map once the world is generated, and null when it is disposed */
   onMapChange?: (map: StrategyMap | null) => void
-  /** Faction of each city (its emblem). Omit to use the city data; cities not listed keep theirs */
-  cityOwners?: Readonly<Record<string, string | undefined>>
+  /**
+   * The cities to draw (those with a position in placeLayout.ts): names, pictures and factions (emblems).
+   * Changes to the pictures and factions show at once; the ground under the cities is levelled for their
+   * pictures when the map is built. Omit for SAMPLE_CITIES (the map on its own)
+   */
+  cities?: readonly MapCity[]
   /** Season of the land (fades over when it changes). Omit to let the view keep its own (summer at first) */
   season?: MapSeason
 }
 
 export default function MapView({
-  selectedPlace: selectedProp, onSelectPlace, showControls = true, onMapChange, cityOwners, season: seasonProp,
+  selectedPlace: selectedProp, onSelectPlace, showControls = true, onMapChange, cities = SAMPLE_CITIES, season: seasonProp,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<StrategyMap | null>(null)
@@ -56,6 +60,7 @@ export default function MapView({
   const [ownSeason, setOwnSeason] = useState<MapSeason>('summer')
   const season = seasonProp ?? ownSeason
   const seasonRef = useRef(season)
+  const citiesRef = useRef(cities)
   const notifyMap = useEffectEvent((value: StrategyMap | null) => onMapChange?.(value))
   const [forestSettings, setForestSettings] = useState(readForestSettings)
   const forestSettingsRef = useRef(forestSettings)
@@ -77,12 +82,14 @@ export default function MapView({
     if (!container) return
     let map: StrategyMap | null = null
     let cancelled = false
-    const job = loadWorld()
+    // The world is generated for the cities as they are now (a map built again for other pictures generates it again)
+    const places = placesOf(citiesRef.current)
+    const job = loadWorld({ places: places.map(({ id, name, type, x, z }) => ({ id, name, type, x, z })) })
     job.promise.then((world) => {
       if (cancelled) return
       for (const warning of world.warnings) console.warn('[placeLayout]', warning)
       setWarnings(world.warnings)
-      map = new StrategyMap(container, world, {
+      map = new StrategyMap(container, world, citiesRef.current, {
         forest: forestSettingsRef.current,
         parchment: parchmentSettingsRef.current,
         terrain: terrainSettingsRef.current,
@@ -111,8 +118,9 @@ export default function MapView({
   }, [])
 
   useEffect(() => {
-    if (map && cityOwners) map.setCityOwners(cityOwners)
-  }, [map, cityOwners])
+    citiesRef.current = cities
+    map?.setCities(cities)
+  }, [map, cities])
 
   // The map is built in the season of the time it is ready, then fades between them
   useEffect(() => {
@@ -140,9 +148,9 @@ export default function MapView({
       const point = mapRef.current.pickImagePoint(e.clientX, e.clientY)
       if (!point) return
       const text = `[${point[0]}, ${point[1]}]`
-      setPicked(`${text}${describeNearest(point)}`)
+      setPicked(`${text}${describeNearest(point, citiesRef.current)}`)
       navigator.clipboard?.writeText(text).then(
-        () => setPicked(`${text}${describeNearest(point)}（コピー済み）`), () => {})
+        () => setPicked(`${text}${describeNearest(point, citiesRef.current)}（コピー済み）`), () => {})
     }
     container.addEventListener('pointerdown', onDown)
     container.addEventListener('pointerup', onUp)
@@ -215,13 +223,13 @@ export default function MapView({
 }
 
 /** Nearest city to an image-space point, e.g. " / P011 コルネリア から 120px" */
-function describeNearest([x, y]: [number, number]): string {
+function describeNearest([x, y]: [number, number], cities: readonly MapCity[]): string {
   let nearest: { id: string; d: number } | null = null
   for (const [id, [px, py]] of Object.entries(PLACE_POSITIONS)) {
     const d = Math.hypot(px - x, py - y)
     if (!nearest || d < nearest.d) nearest = { id, d }
   }
   if (!nearest || nearest.d > 400) return ''
-  const name = PLACES.find((p) => p.id === nearest.id)?.name ?? ''
+  const name = cities.find((c) => c.id === nearest.id)?.name ?? ''
   return ` / ${nearest.id} ${name} から ${Math.round(nearest.d)}px`
 }

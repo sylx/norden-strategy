@@ -36,9 +36,9 @@ npm run dev
 | `selectedPlace`, `onSelectPlace` | 選択中の都市ID（`''` で未選択）。クリックで選んだ都市を通知。省略時は内部で保持 |
 | `showControls` | 右上の調整パネルの表示（初期値 `true`）。非表示の時は選択の強調表示を呼び出し側で行う |
 | `onMapChange` | 地形の生成後に `StrategyMap`、破棄時に `null` を通知 |
-| `cityOwners` | 都市IDごとの所属勢力（`{ P004: 'carta' }`）。地図の紋章と都市名の横の紋章を切り替える。載っていない都市は元の所属のまま、`undefined` は中立。省略時は `src/data/` の所属 |
+| `cities` | 描く都市（`MapCity`: `id`・`name`・`type`（絵）・`belongTo`（所属。省略は中立））。`placeLayout.ts` に位置のある都市だけを描く。絵と所属の変更はすぐ反映される（都市の下の整地は地図を作ったときの絵に合わせる）。省略時は `SAMPLE_CITIES`（全位置を ID の名前で、絵を順に並べた見本） |
 
-`StrategyMap` の主なメソッド: `setCityHighlights`（都市の強調）、`setRoadHighlights`（街道の強調。`from` → `to` の向きに流れる模様）、`march` / `onMarchArrive`（行軍の表示と到着の通知）、`focusPlace`（カメラ移動）、`setCityOwners`（`cityOwners` と同じ）。
+`StrategyMap` の主なメソッド: `setCityHighlights`（都市の強調）、`setRoadHighlights`（街道の強調。`from` → `to` の向きに流れる模様）、`march` / `onMarchArrive`（行軍の表示と到着の通知）、`focusPlace`（カメラ移動）、`setCities`（`cities` と同じ）、`places`（描いている都市）。
 
 地形の生成結果（Worker の出力）はモジュール内に1つ保持し、同じ設定で `MapView` を作り直したとき（シーンの切り替えで戻ったときなど）は再生成せずに使い回します。GPU の資源はマウントのたびに作り直します。
 
@@ -65,7 +65,7 @@ npm run dev
 | `src/map/engine/Cities.ts` | 都市の板絵・画像ごとの接地点 |
 | `src/map/engine/PlaceLabels.ts` | 都市名と紋章のHTMLレイヤー |
 | `src/map/engine/placeSettings.ts` / `src/map/PlaceControls.tsx` | 都市と街道の設定・調整UI |
-| `src/data/` | 地図が描く都市・勢力のデータ。nordencult の `src/data/cityData.json`・`factionData.json`（norden-data で編集する）の写しで、ゲームのテストで比べる |
+| `src/data/` | 地図が描く勢力のデータ（紋章）。nordencult の `src/data/factionData.json`（norden-data で編集する）の写しで、ゲームのテストで比べる。都市は写しを持たず、埋め込むアプリが `MapView` の `cities`（名前・絵・所属）で渡す（単体では `SAMPLE_CITIES`）。位置と街道は `src/map/world/placeLayout.ts` |
 | `src/data/emblem.ts` | 紋章の画像（`src/assets/emblems/`）。番号で引く `emblemImage` |
 
 ワールド座標は 1 単位 = 旧地図画像の 8px（`IMAGE_TO_WORLD`）。

@@ -255,6 +255,18 @@ export class Cities {
     if (emblem) addMesh(this.emblems, this.emblemMaterial(emblem), `${place.id}-emblem`)
   }
 
+  /** Changes the pictures of the cities; cities not listed keep theirs */
+  setTypes(types: Readonly<Record<string, PlaceType>>) {
+    for (const [id, type] of Object.entries(types)) {
+      const entry = this.places.get(id)
+      if (!entry || entry.place.type === type) continue
+      for (const mesh of entry.meshes) mesh.removeFromParent()
+      entry.meshes = []
+      entry.place = { ...entry.place, type }
+      this.addMeshes(entry)
+    }
+  }
+
   /** Changes the factions the cities belong to (their emblems); cities not listed keep theirs */
   setOwners(owners: Readonly<Record<string, string | undefined>>) {
     for (const [id, owner] of Object.entries(owners)) {
@@ -300,8 +312,9 @@ export class Cities {
    * above the place's ground point.
    */
   screenSize(place: Place, depth: number): { size: number; lift: number } {
-    const card = cardPixels(place.type, depth, this.shared.uPxScale.value, this.settings)
-    const cardLift = (0.5 - PLACE_ART[place.type].anchor[1]) * card
+    const type = this.places.get(place.id)?.place.type ?? place.type
+    const card = cardPixels(type, depth, this.shared.uPxScale.value, this.settings)
+    const cardLift = (0.5 - PLACE_ART[type].anchor[1]) * card
     if (!emblemUrl(this.places.get(place.id)?.owner)) return { size: card, lift: cardLift }
     const art = this.artAlpha.value
     return { size: THREE.MathUtils.lerp(this.settings.emblemPx, card, art), lift: cardLift * art }

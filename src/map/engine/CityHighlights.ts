@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { Place } from '../world/placeLayout'
+import type { Place, PlaceType } from '../world/placeLayout'
 import { PLACE_KINDS } from '../world/placeLayout'
 import type { OverlayUniforms } from './overlayUniforms'
 import { PLACE_DEFAULTS, type PlaceSettings } from './placeSettings'
@@ -139,6 +139,14 @@ export class CityHighlights {
     this.group.name = 'city-highlights'
   }
 
+  /** Changes the pictures of the cities (the rings follow their size from the next set()); cities not listed keep theirs */
+  setTypes(types: Readonly<Record<string, PlaceType>>) {
+    for (const [id, type] of Object.entries(types)) {
+      const place = this.places.get(id)
+      if (place && place.type !== type) this.places.set(id, { ...place, type })
+    }
+  }
+
   applySettings(settings: PlaceSettings) {
     this.shared.uSize.value = settings.citySize
     this.shared.uMinPx.value = settings.cityMinPx
@@ -154,7 +162,7 @@ export class CityHighlights {
       const place = this.places.get(h.id)
       if (!place) continue
       const color = new THREE.Color(h.color ?? CITY_HIGHLIGHT_COLOR)
-      const key = `${h.id}:${color.getHexString()}`
+      const key = `${h.id}:${place.type}:${color.getHexString()}`
       const kept = previous.get(key)
       if (kept) {
         previous.delete(key)
