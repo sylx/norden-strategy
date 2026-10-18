@@ -5,6 +5,7 @@ import fortress2Url from '../../assets/places/place_fortress2.webp'
 import metropoliceUrl from '../../assets/places/place_metropolice.webp'
 import templeUrl from '../../assets/places/place_temple.webp'
 import townUrl from '../../assets/places/place_town.webp'
+import { emblemImage } from '../../data/emblem'
 import { FACTION_MAP } from '../../data/faction'
 import type { Heightfield } from '../world/Heightfield'
 import { PLACE_KINDS, type Place, type PlaceType } from '../world/placeLayout'
@@ -25,11 +26,9 @@ export const PLACE_ART: Readonly<Record<PlaceType, { url: string; anchor: readon
   temple: { url: templeUrl, anchor: [0.5, 0.45], bottom: 0.16 },
 }
 
-const EMBLEMS = import.meta.glob<string>('../../assets/emblems/emblem_*.png', { eager: true, import: 'default' })
-
+/** Emblem image of a faction (in the map's copy of the factions) */
 export function emblemUrl(factionId?: string): string | undefined {
-  const emblem = factionId ? FACTION_MAP[factionId]?.emblem : undefined
-  return emblem ? EMBLEMS[`../../assets/emblems/emblem_${String(emblem).padStart(2, '0')}.png`] : undefined
+  return emblemImage(factionId ? FACTION_MAP[factionId]?.emblem : undefined)
 }
 
 /** On-screen width (CSS px) of a town's card at a view depth */

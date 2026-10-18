@@ -2,3 +2,4 @@
 export { PLACES, ROAD_LINKS, type Place, type PlaceType } from './map/world/placeLayout'
 export { CITY_LIST, CITY_MAP, type City } from './data/city'
 export { FACTION_LIST, FACTION_MAP, type Faction } from './data/faction'
+export { EMBLEM_NUMBERS, emblemImage } from './data/emblem'

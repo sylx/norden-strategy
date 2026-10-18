@@ -65,6 +65,7 @@ npm run dev
 | `src/map/engine/Cities.ts` | 都市の板絵・画像ごとの接地点 |
 | `src/map/engine/PlaceLabels.ts` | 都市名と紋章のHTMLレイヤー |
 | `src/map/engine/placeSettings.ts` / `src/map/PlaceControls.tsx` | 都市と街道の設定・調整UI |
-| `src/data/` | 都市・勢力のゲームデータ（nordencult-old から移植） |
+| `src/data/` | 地図が描く都市・勢力のデータ。nordencult の `src/data/cityData.json`・`factionData.json`（norden-data で編集する）の写しで、ゲームのテストで比べる |
+| `src/data/emblem.ts` | 紋章の画像（`src/assets/emblems/`）。番号で引く `emblemImage` |
 
 ワールド座標は 1 単位 = 旧地図画像の 8px（`IMAGE_TO_WORLD`）。
