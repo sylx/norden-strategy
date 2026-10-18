@@ -33,7 +33,7 @@ export const CITY_LIST: City[] = [
     "tags": ["遺跡", "聖地", "中立"],
     "population": 12000,
     "market": 400,
-    "production": 0,
+    "production": 200,
     "belongTo": "sede"
   },
   {
