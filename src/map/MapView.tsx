@@ -42,10 +42,12 @@ export interface MapViewProps {
   cities?: readonly MapCity[]
   /** Season of the land (fades over when it changes). Omit to let the view keep its own (summer at first) */
   season?: MapSeason
+  /** Show the dev build's stats (fps, tiles…) and clicked image coordinates at the bottom-left (default true) */
+  showStats?: boolean
 }
 
 export default function MapView({
-  selectedPlace: selectedProp, onSelectPlace, showControls = true, onMapChange, cities = SAMPLE_CITIES, season: seasonProp,
+  selectedPlace: selectedProp, onSelectPlace, showControls = true, onMapChange, cities = SAMPLE_CITIES, season: seasonProp, showStats = true,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<StrategyMap | null>(null)
@@ -212,7 +214,7 @@ export default function MapView({
         <TerrainControls settings={terrainSettings} onChange={changeTerrainSettings}
           vertices={stats?.vertices} tiles={stats?.tiles} />
       </aside>}
-      {import.meta.env.DEV && stats && (
+      {import.meta.env.DEV && showStats && stats && (
         <div className="map-view__stats">
           {stats.fps.toFixed(0)} fps / {stats.tiles} tiles / {(stats.vertices / 1000).toFixed(0)}k verts / {stats.trees.toLocaleString()} trees / dist {stats.distance.toFixed(0)}
           {picked && <div>クリック地点 {picked}</div>}
