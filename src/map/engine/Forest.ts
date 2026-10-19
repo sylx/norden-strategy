@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 import atlasUrl from '../../assets/forest/woodland-atlas.png'
+import springAtlasUrl from '../../assets/forest/woodland-atlas-spring.png'
+import autumnAtlasUrl from '../../assets/forest/woodland-atlas-autumn.png'
 import type { WorldData } from '../world/generateWorld'
 import { groundObjectDepth, terrainCommon } from './terrainShader'
 import { FOREST_DEFAULTS, type ForestSettings } from './forestSettings'
@@ -54,6 +56,8 @@ void main() {
 
 const fragmentShader = /* glsl */ `
 uniform sampler2D uAtlas;
+uniform sampler2D uSpringAtlas;
+uniform sampler2D uAutumnAtlas;
 uniform float uBrightness;
 uniform float uWarmth;
 uniform float uShade;
@@ -70,22 +74,34 @@ in float vSeed;
 in float vSnow;
 out vec4 fragColor;
 ${seasonGlsl}
-// Conifers keep their needles all year; about one broadleaf in ten blossoms in spring
-vec3 seasonalCrown(vec3 col) {
-  vec3 broad = foliage(col, vSeed);
-  vec3 blossom = mix(recolor(col, seasonRgb(242.0, 196.0, 210.0)) * 1.9, col, 0.2);
-  broad = mix(broad, blossom, uSeason.x * step(vSeed, 0.1));
-  vec3 conifer = col * mix(1.0, 0.85, uSeason.w);
-  return mix(broad, conifer, vConifer);
+vec4 seasonalTree(vec3 tint) {
+  vec4 base = texture(uAtlas, vUv);
+  base.rgb *= tint;
+  // Keep evergreen needles on the original atlas in every season.
+  if (vConifer > 0.5) return vec4(base.rgb * mix(1.0, 0.85, uSeason.w), base.a);
+  vec3 winter = recolor(base.rgb, seasonRgb(128.0, 94.0, 62.0)) * 0.85;
+  // Blend premultiplied colours and coverage: flowers, bare branches and
+  // fallen leaves have different silhouettes, including transparent gaps.
+  vec4 blended = vec4((base.rgb * uSeason.y + winter * uSeason.w) * base.a,
+    base.a * (uSeason.y + uSeason.w));
+  if (uSeason.x > 0.0) {
+    vec4 spring = texture(uSpringAtlas, vUv);
+    blended += vec4(spring.rgb * tint * spring.a, spring.a) * uSeason.x;
+  }
+  if (uSeason.z > 0.0) {
+    vec4 autumn = texture(uAutumnAtlas, vUv);
+    blended += vec4(autumn.rgb * tint * autumn.a, autumn.a) * uSeason.z;
+  }
+  return vec4(blended.rgb / max(blended.a, 1e-4), blended.a);
 }
 void main() {
-  vec4 texel = texture(uAtlas, vUv);
+  vec3 tint = mix(vec3(0.52, 1.0, 0.90), vec3(1.12, 1.0, 0.64), uWarmth);
+  vec4 texel = seasonalTree(tint);
   // Opaque depth-writing cutouts need no per-tree transparency sorting.
   float width = max(fwidth(texel.a), 0.025);
   float alpha = smoothstep(0.3 - width, 0.3 + width, texel.a);
   if (alpha < uAlphaCut) discard;
-  vec3 tint = mix(vec3(0.52, 1.0, 0.90), vec3(1.12, 1.0, 0.64), uWarmth);
-  vec3 col = seasonalCrown(texel.rgb * tint) * uBrightness * vTone;
+  vec3 col = texel.rgb * uBrightness * vTone;
   // Summer: richer leaves in warm sunshine
   col = max(mix(vec3(luma(col)), col, 1.0 + 0.12 * uSeason.y), 0.0) * mix(vec3(1.0), vec3(1.08, 1.05, 0.95), uSeason.y);
   float crownHeight = fract(vUv.y * 2.0);
@@ -106,11 +122,11 @@ interface Candidate { x: number; z: number; height: number; size: number; specie
 interface Chunk { geometry: THREE.InstancedBufferGeometry; capacity: number }
 export type ForestTextureStatus = 'loading' | 'ready' | 'error'
 
-/** Deterministic, chunk-culled instancing: four vertices per tree, one atlas. */
+/** Deterministic, chunk-culled instancing: four vertices per tree, seasonal atlases. */
 export class Forest {
   readonly group = new THREE.Group()
   private readonly material: THREE.ShaderMaterial
-  private readonly texture: THREE.Texture
+  private readonly textures: THREE.Texture[]
   private readonly chunks: Chunk[] = []
   private settings = { ...FOREST_DEFAULTS }
   private disposed = false
@@ -129,7 +145,8 @@ export class Forest {
         uTexturedForest: u.uTexturedForest, uForestDensity: u.uForestDensity, uForestShade: u.uForestShade,
         uSeason: u.uSeason,
         uFogColor: u.uFogColor, uFogNear: u.uFogNear, uFogFar: u.uFogFar,
-        uAtlas: { value: null }, uSize: { value: this.settings.size },
+        uAtlas: { value: null }, uSpringAtlas: { value: null }, uAutumnAtlas: { value: null },
+        uSize: { value: this.settings.size },
         uVariation: { value: this.settings.variation }, uConifers: { value: this.settings.conifers },
         uBrightness: { value: this.settings.brightness }, uWarmth: { value: this.settings.warmth },
         uShade: { value: this.settings.shade }, uAlphaCut: { value: 0.01 },
@@ -137,19 +154,30 @@ export class Forest {
     })
     this.group.name = 'painted-woodland'
     this.group.visible = false
-    this.texture = new THREE.TextureLoader().load(atlasUrl, (texture) => {
-      if (this.disposed) { texture.dispose(); return }
-      this.status = 'ready'
-      this.applySettings(this.settings)
-    }, undefined, () => {
-      if (!this.disposed) {
-        this.status = 'error'
-        this.applySettings(this.settings)
-      }
+    const atlases = [
+      ['uAtlas', atlasUrl], ['uSpringAtlas', springAtlasUrl], ['uAutumnAtlas', autumnAtlasUrl],
+    ] as const
+    let loaded = 0
+    const loader = new THREE.TextureLoader()
+    this.textures = atlases.map(([uniform, url]) => {
+      const texture = loader.load(url, (loadedTexture) => {
+        if (this.disposed) { loadedTexture.dispose(); return }
+        loaded++
+        if (loaded === atlases.length && this.status !== 'error') {
+          this.status = 'ready'
+          this.applySettings(this.settings)
+        }
+      }, undefined, () => {
+        if (!this.disposed) {
+          this.status = 'error'
+          this.applySettings(this.settings)
+        }
+      })
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.anisotropy = Math.min(8, anisotropy)
+      this.material.uniforms[uniform].value = texture
+      return texture
     })
-    this.texture.colorSpace = THREE.SRGBColorSpace
-    this.texture.anisotropy = Math.min(8, anisotropy)
-    this.material.uniforms.uAtlas.value = this.texture
 
     const buckets = new Map<string, Candidate[]>()
     const cells = Math.ceil(world.worldSize / SPACING)
@@ -228,7 +256,7 @@ export class Forest {
     this.disposed = true
     for (const chunk of this.chunks) chunk.geometry.dispose()
     this.material.dispose()
-    this.texture.dispose()
+    for (const texture of this.textures) texture.dispose()
     this.group.clear()
   }
 }
