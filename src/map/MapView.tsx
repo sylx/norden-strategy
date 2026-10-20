@@ -44,10 +44,13 @@ export interface MapViewProps {
   season?: MapSeason
   /** Show the dev build's stats (fps, tiles…) and clicked image coordinates at the bottom-left (default true) */
   showStats?: boolean
+  /** In the dev build, copy the image coordinates of a click to the clipboard for placeLayout.ts (default true) */
+  copyClickPoint?: boolean
 }
 
 export default function MapView({
   selectedPlace: selectedProp, onSelectPlace, showControls = true, onMapChange, cities = SAMPLE_CITIES, season: seasonProp, showStats = true,
+  copyClickPoint = true,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<StrategyMap | null>(null)
@@ -64,6 +67,7 @@ export default function MapView({
   const seasonRef = useRef(season)
   const citiesRef = useRef(cities)
   const notifyMap = useEffectEvent((value: StrategyMap | null) => onMapChange?.(value))
+  const copiesClickPoint = useEffectEvent(() => copyClickPoint)
   const [forestSettings, setForestSettings] = useState(readForestSettings)
   const forestSettingsRef = useRef(forestSettings)
   const [parchmentSettings, setParchmentSettings] = useState(readParchmentSettings)
@@ -135,7 +139,7 @@ export default function MapView({
     if (map && selectedPlace) map.focusPlace(selectedPlace)
   }, [map, selectedPlace])
 
-  // A click (not a drag) selects the city under it; in dev it also shows the image coordinates for placeLayout.ts
+  // A click (not a drag) selects the city under it; in dev it also shows and copies the image coordinates for placeLayout.ts (copyClickPoint)
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -146,7 +150,7 @@ export default function MapView({
       down = null
       if (!mapRef.current) return
       selectPlace(mapRef.current.pickPlace(e.clientX, e.clientY) ?? '')
-      if (!import.meta.env.DEV) return
+      if (!import.meta.env.DEV || !copiesClickPoint()) return
       const point = mapRef.current.pickImagePoint(e.clientX, e.clientY)
       if (!point) return
       const text = `[${point[0]}, ${point[1]}]`

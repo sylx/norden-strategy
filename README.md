@@ -35,6 +35,7 @@ npm run dev
 | --- | --- |
 | `selectedPlace`, `onSelectPlace` | 選択中の都市ID（`''` で未選択）。クリックで選んだ都市を通知。省略時は内部で保持 |
 | `showControls` | 右上の調整パネルの表示（初期値 `true`）。非表示の時は選択の強調表示を呼び出し側で行う |
+| `copyClickPoint` | 開発時に、クリックした地点の画像座標（`placeLayout.ts` 用）をクリップボードにコピーする（初期値 `true`）。ゲームに組み込むときは `false` |
 | `onMapChange` | 地形の生成後に `StrategyMap`、破棄時に `null` を通知 |
 | `cities` | 描く都市（`MapCity`: `id`・`name`・`type`（絵）・`belongTo`（所属。省略は中立））。`placeLayout.ts` に位置のある都市だけを描く。絵と所属の変更はすぐ反映される（都市の下の整地は地図を作ったときの絵に合わせる）。省略時は `SAMPLE_CITIES`（全位置を ID の名前で、絵を順に並べた見本） |
 
