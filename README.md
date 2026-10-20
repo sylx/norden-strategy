@@ -38,6 +38,8 @@ npm run dev
 | `onMapChange` | 地形の生成後に `StrategyMap`、破棄時に `null` を通知 |
 | `cities` | 描く都市（`MapCity`: `id`・`name`・`type`（絵）・`belongTo`（所属。省略は中立））。`placeLayout.ts` に位置のある都市だけを描く。絵と所属の変更はすぐ反映される（都市の下の整地は地図を作ったときの絵に合わせる）。省略時は `SAMPLE_CITIES`（全位置を ID の名前で、絵を順に並べた見本） |
 
+地形の生成だけが要るとき（ゲームの街道マップを地理情報から作るツールなど）は、`src/world.ts` を使います（ルートからは `norden-strategy/world`）。`generateWorld` と、その出力をワールド座標で読む `WorldSampler`（標高・川と湖・山岳度・森・乾燥度）を出します。
+
 `StrategyMap` の主なメソッド: `setCityHighlights`（都市の強調）、`setRoadHighlights`（街道の強調。`from` → `to` の向きに流れる模様）、`march` / `onMarchArrive`（行軍の表示と到着の通知）、`focusPlace`（カメラ移動）、`setCities`（`cities` と同じ）、`places`（描いている都市）。
 
 地形の生成結果（Worker の出力）はモジュール内に1つ保持し、同じ設定で `MapView` を作り直したとき（シーンの切り替えで戻ったときなど）は再生成せずに使い回します。GPU の資源はマウントのたびに作り直します。
@@ -61,6 +63,7 @@ npm run dev
 | `src/map/SettingsExport.tsx` | 森と羊皮紙の設定をJSONとしてコピー |
 | `src/map/world/placeLayout.ts` | 都市の位置・街道のつながり・都市の種類ごとの大きさ（手で編集する） |
 | `src/map/world/roads.ts` | 街道の経路探索（生成グリッド上の A*）と平滑化 |
+| `src/map/world/sampleWorld.ts` | マクロ地形をワールド座標で読む（`WorldSampler`。`src/world.ts` から公開） |
 | `src/map/engine/Roads.ts` | 地表に沿う街道の帯 |
 | `src/map/engine/Cities.ts` | 都市の板絵・画像ごとの接地点 |
 | `src/map/engine/PlaceLabels.ts` | 都市名と紋章のHTMLレイヤー |
