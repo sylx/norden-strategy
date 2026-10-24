@@ -91,6 +91,27 @@ export class MapCameraController {
     this.velocity.set(0, 0)
   }
 
+  /** Glide the look-at point to x/z, easing the zoom to `distance` on the way */
+  glideTo(x: number, z: number, distance: number) {
+    this.panTo(x, z)
+    this.targetDistance = this.clampDistance(distance)
+  }
+
+  /**
+   * The distance whose view takes in a rectangle of the ground around the look-at point, `halfX` either side
+   * across the screen and `halfZ` towards and away from the camera (the ground is foreshortened by the pitch)
+   */
+  distanceToFit(halfX: number, halfZ: number) {
+    const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)
+    const tanH = tanV * this.camera.aspect
+    // The pitch follows the distance: a few rounds settle it
+    let distance = this.clampDistance(halfX / tanH)
+    for (let i = 0; i < 4; i++) {
+      distance = this.clampDistance(Math.max(halfX / tanH, (halfZ * Math.sin(this.pitchAt(distance))) / tanV))
+    }
+    return distance
+  }
+
   getView() {
     return { x: this.target.x, z: this.target.z, distance: this.distance }
   }
@@ -143,10 +164,15 @@ export class MapCameraController {
     }
   }
 
-  private applyCamera() {
+  /** Elevation angle (rad) of the camera at a distance: it tilts down as it zooms out */
+  private pitchAt(distance: number) {
     const { minDistance, maxDistance, minPitch, maxPitch } = this.limits
-    const t = Math.log(this.distance / minDistance) / Math.log(maxDistance / minDistance)
-    const pitch = THREE.MathUtils.degToRad(THREE.MathUtils.lerp(minPitch, maxPitch, THREE.MathUtils.smoothstep(t, 0, 1)))
+    const t = Math.log(distance / minDistance) / Math.log(maxDistance / minDistance)
+    return THREE.MathUtils.degToRad(THREE.MathUtils.lerp(minPitch, maxPitch, THREE.MathUtils.smoothstep(t, 0, 1)))
+  }
+
+  private applyCamera() {
+    const pitch = this.pitchAt(this.distance)
     const cam = this.camera
     cam.position.set(
       this.target.x,

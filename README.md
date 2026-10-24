@@ -41,7 +41,7 @@ npm run dev
 
 地形の生成だけが要るとき（ゲームの街道マップを地理情報から作るツールなど）は、`src/world.ts` を使います（ルートからは `norden-strategy/world`）。`generateWorld` と、その出力をワールド座標で読む `WorldSampler`（標高・川と湖・山岳度・森・乾燥度）を出します。
 
-`StrategyMap` の主なメソッド: `setCityHighlights`（都市の強調）、`setRoadHighlights`（街道の強調。`from` → `to` の向きに流れる模様）、`march` / `onMarchArrive`（行軍の表示と到着の通知）、`focusPlace`（カメラ移動）、`setCities`（`cities` と同じ）、`places`（描いている都市）。
+`StrategyMap` の主なメソッド: `setCityHighlights`（都市の強調）、`setRoadHighlights`（街道の強調。`from` → `to` の向きに流れる模様）、`march` / `onMarchArrive`（行軍の表示と到着の通知）、`focusPlace`（カメラ移動。ズームはそのまま）、`focusPlaces`（複数の都市が入るように、その中心へ移動してズームも合わせる。`margin`（既定1.8）で周りに残す余白、`instant` で瞬時に）、`setCities`（`cities` と同じ）、`places`（描いている都市）。
 
 地形の生成結果（Worker の出力）はモジュール内に1つ保持し、同じ設定で `MapView` を作り直したとき（シーンの切り替えで戻ったときなど）は再生成せずに使い回します。GPU の資源はマウントのたびに作り直します。
 

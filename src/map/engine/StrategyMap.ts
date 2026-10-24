@@ -31,6 +31,8 @@ const HEIGHT_SCALE = 1.4
 const TERRAIN_EXTENT = 4096
 /** Hit radius of a city against the on-screen size of its card or emblem */
 const PICK_RADIUS = 0.4
+/** focusPlaces spreads the cities over 1 / FOCUS_MARGIN of the view, leaving room for the UI around */
+const FOCUS_MARGIN = 1.8
 
 export interface MapStats {
   fps: number
@@ -334,6 +336,27 @@ export class StrategyMap {
     if (!place) return
     if (instant) this.controls.setView(place.x, place.z, this.controls.getView().distance)
     else this.controls.panTo(place.x, place.z)
+  }
+
+  /**
+   * Moves the camera over several cities (e.g. both ends of a route) and zooms so that all of them are in view,
+   * spread over 1 / `margin` of it (room for the UI around); glides there unless `instant`.
+   * A single city is focusPlace (keeping the zoom)
+   */
+  focusPlaces(ids: readonly string[], { instant = false, margin = FOCUS_MARGIN }: { instant?: boolean; margin?: number } = {}) {
+    const places = this.placeList.filter((p) => ids.includes(p.id))
+    if (places.length <= 1) {
+      if (places[0]) this.focusPlace(places[0].id, instant)
+      return
+    }
+    const xs = places.map((p) => p.x)
+    const zs = places.map((p) => p.z)
+    const [minX, maxX, minZ, maxZ] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)]
+    const distance = this.controls.distanceToFit(((maxX - minX) / 2) * margin, ((maxZ - minZ) / 2) * margin)
+    const x = (minX + maxX) / 2
+    const z = (minZ + maxZ) / 2
+    if (instant) this.controls.setView(x, z, distance)
+    else this.controls.glideTo(x, z, distance)
   }
 
   setParchmentSettings(settings: ParchmentSettings) {
