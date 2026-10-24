@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import envoyUrl from '../../assets/marches/envoy.svg'
-import transportUrl from '../../assets/marches/transport.svg'
+import envoyUrl from '../../assets/marches/envoy.webp'
+import transportUrl from '../../assets/marches/transport.webp'
 import type { Heightfield } from '../world/Heightfield'
 import type { OverlayUniforms } from './overlayUniforms'
 import type { PathSample, Polyline } from './roadNetwork'
