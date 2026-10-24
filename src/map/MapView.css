@@ -16,6 +16,15 @@
   cursor: grabbing;
 }
 
+/* The room the focus test takes the UI to cover (focusPlaces' inset) */
+.map-view__inset {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: 0 solid rgb(176 52 44 / 0.28);
+  pointer-events: none;
+}
+
 .map-view__loading {
   position: absolute;
   inset: 0;
@@ -128,6 +137,9 @@
 .map-controls__heading:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 .map-controls__field { display: grid; gap: 4px; margin: 8px 0; min-width: 0; }
 .map-controls__field select { width: 100%; min-width: 0; }
+.map-controls__chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; padding: 0; list-style: none; }
+.map-controls__chips li { display: flex; align-items: center; gap: 4px; padding: 2px 2px 2px 8px; font-size: 12px; background: #303c31; border: 1px solid #65705b; border-radius: 4px; }
+.map-controls__chips button { padding: 0 6px; line-height: 1.4; }
 .map-controls input[type='text'] {
   box-sizing: border-box;
   width: 100%;

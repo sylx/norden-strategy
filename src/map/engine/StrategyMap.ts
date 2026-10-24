@@ -34,6 +34,21 @@ const PICK_RADIUS = 0.4
 /** focusPlaces spreads the cities over 1 / FOCUS_MARGIN of the view, leaving room for the UI around */
 const FOCUS_MARGIN = 1.8
 
+/** The room the UI covers at each edge of the map's view (CSS px), for focusPlaces */
+export interface FocusInset {
+  left?: number
+  right?: number
+  top?: number
+  bottom?: number
+}
+
+export interface FocusOptions {
+  instant?: boolean
+  /** The cities are spread over 1 / margin of the room (FOCUS_MARGIN) */
+  margin?: number
+  inset?: FocusInset
+}
+
 export interface MapStats {
   fps: number
   tiles: number
@@ -340,21 +355,32 @@ export class StrategyMap {
 
   /**
    * Moves the camera over several cities (e.g. both ends of a route) and zooms so that all of them are in view,
-   * spread over 1 / `margin` of it (room for the UI around); glides there unless `instant`.
-   * A single city is focusPlace (keeping the zoom)
+   * spread over 1 / `margin` of it; glides there unless `instant`. `inset` is the room the UI covers at the edges
+   * of the view (CSS px): the cities are fitted into the rest and centred there. A single city keeps the zoom
    */
-  focusPlaces(ids: readonly string[], { instant = false, margin = FOCUS_MARGIN }: { instant?: boolean; margin?: number } = {}) {
+  focusPlaces(ids: readonly string[], { instant = false, margin = FOCUS_MARGIN, inset = {} }: FocusOptions = {}) {
     const places = this.placeList.filter((p) => ids.includes(p.id))
-    if (places.length <= 1) {
-      if (places[0]) this.focusPlace(places[0].id, instant)
-      return
-    }
+    if (places.length === 0) return
+    const { width, height } = this.viewSize
+    // The UI never covers more than most of the view
+    const edge = (px: number | undefined, size: number) => THREE.MathUtils.clamp(px ?? 0, 0, size * 0.4)
+    const left = edge(inset.left, width)
+    const right = edge(inset.right, width)
+    const top = edge(inset.top, height)
+    const bottom = edge(inset.bottom, height)
     const xs = places.map((p) => p.x)
     const zs = places.map((p) => p.z)
     const [minX, maxX, minZ, maxZ] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)]
-    const distance = this.controls.distanceToFit(((maxX - minX) / 2) * margin, ((maxZ - minZ) / 2) * margin)
-    const x = (minX + maxX) / 2
-    const z = (minZ + maxZ) / 2
+    const distance = places.length === 1
+      ? this.controls.getView().distance
+      : this.controls.distanceToFit(
+        ((maxX - minX) / 2) * margin * (width / (width - left - right)),
+        ((maxZ - minZ) / 2) * margin * (height / (height - top - bottom)),
+      )
+    // The look-at point is off the cities' centre so that they show in the middle of the room left
+    const offset = this.controls.groundOffset(distance, (left - right) / 2, (top - bottom) / 2, height)
+    const x = (minX + maxX) / 2 - offset.x
+    const z = (minZ + maxZ) / 2 - offset.z
     if (instant) this.controls.setView(x, z, distance)
     else this.controls.glideTo(x, z, distance)
   }

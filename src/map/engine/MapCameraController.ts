@@ -164,6 +164,16 @@ export class MapCameraController {
     }
   }
 
+  /**
+   * The ground offset (world x / z) from the look-at point that shows a screen offset (CSS px, right and down)
+   * from the centre of a view `viewHeight` px high, from `distance`
+   */
+  groundOffset(distance: number, dxPx: number, dyPx: number, viewHeight: number) {
+    const perPx = (2 * distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)) / viewHeight
+    // Down the screen is towards the camera (+z), foreshortened by the pitch
+    return { x: dxPx * perPx, z: (dyPx * perPx) / Math.sin(this.pitchAt(distance)) }
+  }
+
   /** Elevation angle (rad) of the camera at a distance: it tilts down as it zooms out */
   private pitchAt(distance: number) {
     const { minDistance, maxDistance, minPitch, maxPitch } = this.limits

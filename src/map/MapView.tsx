@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
-import { StrategyMap, type MapStats } from './engine/StrategyMap'
+import { StrategyMap, type FocusInset, type MapStats } from './engine/StrategyMap'
 import { loadWorld } from './world/loadWorld'
 import { ForestControls } from './ForestControls'
 import { readForestSettings, saveForestSettings, type ForestSettings } from './engine/forestSettings'
@@ -13,6 +13,7 @@ import { PlaceControls } from './PlaceControls'
 import { readPlaceSettings, savePlaceSettings, type PlaceSettings } from './engine/placeSettings'
 import { SettingsExport } from './SettingsExport'
 import { OverlayTestControls } from './OverlayTestControls'
+import { FocusTestControls } from './FocusTestControls'
 import { SeasonControls } from './SeasonControls'
 import type { MapSeason } from './engine/season'
 import { PLACE_POSITIONS, placesOf, SAMPLE_CITIES, type MapCity } from './world/placeLayout'
@@ -82,6 +83,8 @@ export default function MapView({
   const [picked, setPicked] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<MapStats | null>(null)
+  // The room the focus test takes the UI to cover, drawn over the map
+  const [focusInset, setFocusInset] = useState<FocusInset | null>(null)
 
   useEffect(() => {
     const container = containerRef.current
@@ -205,11 +208,17 @@ export default function MapView({
     <div className="map-view">
       <div ref={containerRef} className="map-view__canvas" />
       {loading && <div className="map-view__loading">地図を生成中…</div>}
+      {showControls && focusInset && (
+        <div className="map-view__inset" aria-hidden="true" style={{
+          borderLeftWidth: focusInset.left, borderRightWidth: focusInset.right, borderTopWidth: focusInset.top, borderBottomWidth: focusInset.bottom,
+        }} />
+      )}
       {showControls && <aside className="map-controls" aria-label="地図の描画設定">
         <SettingsExport forest={forestSettings} parchment={parchmentSettings} terrain={terrainSettings}
           render={renderSettings} places={placeSettings} />
         <SeasonControls season={season} onChange={setOwnSeason} />
         <OverlayTestControls map={map} selected={selectedPlace} onSelect={setSelectedPlace} />
+        <FocusTestControls map={map} selected={selectedPlace} inset={focusInset} onInsetChange={setFocusInset} />
         <PlaceControls settings={placeSettings} onChange={changePlaceSettings} warnings={warnings} />
         <RenderControls settings={renderSettings} onChange={changeRenderSettings}
           width={stats?.width} height={stats?.height} fps={stats?.fps} />

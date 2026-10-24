@@ -210,13 +210,9 @@ export function OverlayTestControls({ map, selected, onSelect }: Props) {
           <button type="button" onClick={march} disabled={!map}>進撃開始</button>
           <button type="button" onClick={marchRandom} disabled={!map}>ランダム×5</button>
           <button type="button" onClick={clear} disabled={!map || marching === 0}>消去</button>
-          <button type="button" disabled={!map || !(from || selected) || !to}
-            onClick={() => map?.focusPlaces([from || selected || '', to])}>
-            出発地と目標を映す
-          </button>
         </div>
         <p className="map-controls__note" role="status">
-          {status || '軍団は凸の突き出た側が進行方向です。輸送部隊と使者のアイコンは src/assets/marches/ の画像です。「出発地と目標を映す」は両方が入るようにズームします（focusPlaces）。名前が空なら連番を付けます。'}
+          {status || '軍団は凸の突き出た側が進行方向です。輸送部隊と使者のアイコンは src/assets/marches/ の画像です。名前が空なら連番を付けます。'}
           {marching > 0 && ` （表示中 ${marching} 部隊）`}
         </p>
       </div>
