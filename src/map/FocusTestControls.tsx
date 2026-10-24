@@ -98,7 +98,7 @@ export function FocusTestControls({ map, selected, inset, onInsetChange }: Props
           <button type="button" disabled={ids.length === 0} onClick={() => setIds([])}>クリア</button>
         </div>
         <p className="map-controls__note">
-          focusPlaces: 都市が全部入るように中心へ寄せ、ズームも合わせます。inset の範囲はUIに隠れるとみなし、残りの範囲の真ん中に映します。都市が1つならズームはそのままです。
+          focusPlaces: 都市が全部入るように中心へ寄せ、ズームも合わせます。inset の範囲はUIに隠れるとみなし、残りの範囲に収めます。都市が隠れない限り画面の真ん中に映し、隠れるときは隠れないぶんだけずらします。都市が1つならズームはそのままです。
         </p>
       </div>
     </details>

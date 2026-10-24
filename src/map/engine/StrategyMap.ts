@@ -33,6 +33,18 @@ const TERRAIN_EXTENT = 4096
 const PICK_RADIUS = 0.4
 /** focusPlaces spreads the cities over 1 / FOCUS_MARGIN of the view, leaving room for the UI around */
 const FOCUS_MARGIN = 1.8
+/** Room (CSS px) focusPlaces keeps around the cities' points for their pictures, clear of the inset */
+const FOCUS_PAD_PX = 60
+
+/**
+ * The least shift (px) of a span `half` either side of the centre of a view `size` wide that keeps it clear of
+ * the `start` and `end` covered; the middle of the room left when it does not fit
+ */
+function shiftIntoRoom(half: number, size: number, start: number, end: number) {
+  const lo = start - size / 2 + half
+  const hi = size / 2 - end - half
+  return lo > hi ? (lo + hi) / 2 : THREE.MathUtils.clamp(0, lo, hi)
+}
 
 /** The room the UI covers at each edge of the map's view (CSS px), for focusPlaces */
 export interface FocusInset {
@@ -356,7 +368,9 @@ export class StrategyMap {
   /**
    * Moves the camera over several cities (e.g. both ends of a route) and zooms so that all of them are in view,
    * spread over 1 / `margin` of it; glides there unless `instant`. `inset` is the room the UI covers at the edges
-   * of the view (CSS px): the cities are fitted into the rest and centred there. A single city keeps the zoom
+   * of the view (CSS px): the cities are fitted into the rest, and kept in the middle of the view unless that would
+   * hide them (or their pictures, FOCUS_PAD_PX) under it, then shifted only as far as it takes. A single city keeps
+   * the zoom
    */
   focusPlaces(ids: readonly string[], { instant = false, margin = FOCUS_MARGIN, inset = {} }: FocusOptions = {}) {
     const places = this.placeList.filter((p) => ids.includes(p.id))
@@ -377,8 +391,12 @@ export class StrategyMap {
         ((maxX - minX) / 2) * margin * (width / (width - left - right)),
         ((maxZ - minZ) / 2) * margin * (height / (height - top - bottom)),
       )
-    // The look-at point is off the cities' centre so that they show in the middle of the room left
-    const offset = this.controls.groundOffset(distance, (left - right) / 2, (top - bottom) / 2, height)
+    // The cities' half size on screen (px) at that distance, with room for their pictures
+    const perPx = this.controls.groundOffset(distance, 1, 1, height)
+    const halfPx = { x: (maxX - minX) / 2 / perPx.x + FOCUS_PAD_PX, y: (maxZ - minZ) / 2 / perPx.z + FOCUS_PAD_PX }
+    // The look-at point is off the cities' centre by as much as it takes to keep them clear of the UI
+    const offset = this.controls.groundOffset(distance,
+      shiftIntoRoom(halfPx.x, width, left, right), shiftIntoRoom(halfPx.y, height, top, bottom), height)
     const x = (minX + maxX) / 2 - offset.x
     const z = (minZ + maxZ) / 2 - offset.z
     if (instant) this.controls.setView(x, z, distance)
