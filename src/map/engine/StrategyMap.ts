@@ -32,7 +32,7 @@ const TERRAIN_EXTENT = 4096
 /** Hit radius of a city against the on-screen size of its card or emblem */
 const PICK_RADIUS = 0.4
 /** focusPlaces spreads the cities over 1 / FOCUS_MARGIN of the view, leaving room for the UI around */
-const FOCUS_MARGIN = 1.8
+const FOCUS_MARGIN = 3
 /** Room (CSS px) focusPlaces keeps around the cities' points for their pictures, clear of the inset */
 const FOCUS_PAD_PX = 60
 

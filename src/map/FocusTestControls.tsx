@@ -20,9 +20,9 @@ const EDGES = [
 export function FocusTestControls({ map, selected, inset, onInsetChange }: Props) {
   const [ids, setIds] = useState<readonly string[]>([])
   const [addOnSelect, setAddOnSelect] = useState(true)
-  const [margin, setMargin] = useState(1.8)
+  const [margin, setMargin] = useState(3)
   const [instant, setInstant] = useState(false)
-  const [edges, setEdges] = useState<Required<FocusInset>>({ left: 520, right: 0, top: 0, bottom: 0 })
+  const [edges, setEdges] = useState<Required<FocusInset>>({ left: 360, right: 200, top: 0, bottom: 0 })
   const places = map?.places ?? []
   const placeName = (id: string) => `${id} ${places.find((p) => p.id === id)?.name ?? ''}`
   const add = (id: string) => setIds((current) => (id && !current.includes(id) ? [...current, id] : current))
