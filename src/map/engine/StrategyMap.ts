@@ -194,10 +194,11 @@ export class StrategyMap {
 
     const s = world.worldSize
     this.controls = new MapCameraController(this.camera, this.renderer.domElement, heights, HEIGHT_SCALE, {
-      minDistance: 14,
+      minDistance: 127,
       maxDistance: 1500,
       minPitch: 34,
       maxPitch: 62,
+      pitchDistances: [14, 1500],
       bounds: { minX: s * 0.06, maxX: s * 0.94, minZ: s * 0.1, maxZ: s * 0.94 },
     })
     this.controls.setView(s * 0.52, s * 0.55, 1400)

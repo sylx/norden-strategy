@@ -4,9 +4,11 @@ import type { Heightfield } from '../world/Heightfield'
 export interface CameraLimits {
   minDistance: number
   maxDistance: number
-  /** Elevation angle (deg) when fully zoomed in / out */
+  /** Elevation angle (deg) at the near / far end of pitchDistances */
   minPitch: number
   maxPitch: number
+  /** Distances the pitch eases between; they may reach past the zoom limits */
+  pitchDistances: [number, number]
   /** Allowed rectangle for the look-at point, world x/z */
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number }
 }
@@ -176,8 +178,8 @@ export class MapCameraController {
 
   /** Elevation angle (rad) of the camera at a distance: it tilts down as it zooms out */
   private pitchAt(distance: number) {
-    const { minDistance, maxDistance, minPitch, maxPitch } = this.limits
-    const t = Math.log(distance / minDistance) / Math.log(maxDistance / minDistance)
+    const { pitchDistances: [near, far], minPitch, maxPitch } = this.limits
+    const t = Math.log(distance / near) / Math.log(far / near)
     return THREE.MathUtils.degToRad(THREE.MathUtils.lerp(minPitch, maxPitch, THREE.MathUtils.smoothstep(t, 0, 1)))
   }
 
