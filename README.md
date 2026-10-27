@@ -17,9 +17,9 @@ npm run dev
 
 木は4種類の板絵をインスタンス描画し、64単位の区画で画面外を除外します。川岸・急斜面・高山を避けて配置し、地形と共通の高さシェーダーで接地させています。密度調整は固定された配置の本数だけを変更します。画像の読み込みに失敗した場合は従来の描画へ戻ります。
 
-テクスチャは `src/assets/forest/woodland-atlas.png`。生成方法・最終プロンプトは [アセットの記録](src/assets/forest/README.md) を参照してください。葉の光は画像に描かれているため、現在の北向きカメラに合わせた表現です。
+テクスチャは `src/assets/forest/woodland-atlas.webp`。生成方法・最終プロンプトは [アセットの記録](src/assets/forest/README.md) を参照してください。葉の光は画像に描かれているため、現在の北向きカメラに合わせた表現です。
 
-描画例: [全景](docs/image/forest-overview.png) / [森の拡大](docs/image/forest-detail.png)。ソフトウェアWebGLで撮影しているため、画像内のfpsは実GPUの性能を示すものではありません。
+描画例: [全景](docs/image/forest-overview.webp) / [森の拡大](docs/image/forest-detail.webp)。ソフトウェアWebGLで撮影しているため、画像内のfpsは実GPUの性能を示すものではありません。
 
 ## 都市と街道
 

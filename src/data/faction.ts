@@ -6,7 +6,7 @@
 export interface Faction {
   id: string
   name: string
-  /** Number of the emblem image (src/assets/emblems/emblem_NN.png) */
+  /** Number of the emblem image (src/assets/emblems/emblem_NN.webp) */
   emblem: number
 }
 

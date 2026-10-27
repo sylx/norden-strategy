@@ -1,6 +1,6 @@
 # Woodland atlas
 
-`woodland-atlas.png` is a generated RGBA atlas (1254 × 1254), created with the built-in image_gen tool. Its original alpha is preserved. No external tree pack is required.
+`woodland-atlas.webp` is a generated RGBA atlas (1254 × 1254), created with the built-in image_gen tool. Its original alpha is preserved. No external tree pack is required.
 
 Layout: 2 × 2, top-left oak, top-right beech, bottom-left compact broadleaf, bottom-right spruce. UVs are selected in `Forest.ts`. Trunk bases are approximately 9% above the cell bottom. Lighting is baked from the upper left, matching the map's fixed north-facing camera.
 
@@ -12,18 +12,18 @@ The requested size was 2048 × 2048; the generator returned 1254 × 1254. The re
 
 ## Seasonal woodland atlases
 
-`woodland-atlas.png` is the original summer atlas and the basis for winter's
-shader colouring. `woodland-atlas-spring.png` and `woodland-atlas-autumn.png`
+`woodland-atlas.webp` is the original summer atlas and the basis for winter's
+shader colouring. `woodland-atlas-spring.webp` and `woodland-atlas-autumn.webp`
 are generated seasonal edits of that image, made with the built-in image_gen
-tool. All three files are 1254 × 1254 RGBA PNGs with the same 2 × 2 species
+tool. All three files are 1254 × 1254 RGBA WebPs (converted from the generated PNGs) with the same 2 × 2 species
 layout and transparent backgrounds. The evergreen uses the original sprite
 throughout the year. Seasonal colour and alpha fade with the terrain's season
 weights; spring and autumn do not receive the old foliage recolouring.
 
 Initial in-map previews (same camera, default forest and parchment settings;
 the spring preview predates the reduced-blossom revision below):
-[spring](../../../docs/image/forest-spring.png),
-[autumn](../../../docs/image/forest-autumn.png).
+[spring](../../../docs/image/forest-spring.webp),
+[autumn](../../../docs/image/forest-autumn.webp).
 
 The prompts below requested a 1280 × 1280 canvas; the generator retained the
 reference's actual 1254 × 1254 dimensions. UVs are normalized, so no resizing is
