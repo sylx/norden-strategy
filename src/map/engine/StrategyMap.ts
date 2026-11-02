@@ -35,6 +35,8 @@ const PICK_RADIUS = 0.4
 const FOCUS_MARGIN = 3
 /** Room (CSS px) focusPlaces keeps around the cities' points for their pictures, clear of the inset */
 const FOCUS_PAD_PX = 60
+/** Share of the view focusPlaces fits the cities into however much the insets cover */
+const FOCUS_MIN_ROOM = 0.2
 
 /**
  * The least shift (px) of a span `half` either side of the centre of a view `size` wide that keeps it clear of
@@ -369,7 +371,7 @@ export class StrategyMap {
   /**
    * Moves the camera over several cities (e.g. both ends of a route) and zooms so that all of them are in view,
    * spread over 1 / `margin` of it; glides there unless `instant`. `inset` is the room the UI covers at the edges
-   * of the view (CSS px): the cities are fitted into the rest, and kept in the middle of the view unless that would
+   * of the view (CSS px, half of it at most from an edge): the cities are fitted into the rest, and kept in the middle of the view unless that would
    * hide them (or their pictures, FOCUS_PAD_PX) under it, then shifted only as far as it takes. A single city keeps
    * the zoom
    */
@@ -377,20 +379,21 @@ export class StrategyMap {
     const places = this.placeList.filter((p) => ids.includes(p.id))
     if (places.length === 0) return
     const { width, height } = this.viewSize
-    // The UI never covers more than most of the view
-    const edge = (px: number | undefined, size: number) => THREE.MathUtils.clamp(px ?? 0, 0, size * 0.4)
+    // The UI never covers more than half of the view from an edge
+    const edge = (px: number | undefined, size: number) => THREE.MathUtils.clamp(px ?? 0, 0, size / 2)
     const left = edge(inset.left, width)
     const right = edge(inset.right, width)
     const top = edge(inset.top, height)
     const bottom = edge(inset.bottom, height)
+    const room = (size: number, start: number, end: number) => Math.max(size - start - end, size * FOCUS_MIN_ROOM)
     const xs = places.map((p) => p.x)
     const zs = places.map((p) => p.z)
     const [minX, maxX, minZ, maxZ] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)]
     const distance = places.length === 1
       ? this.controls.getView().distance
       : this.controls.distanceToFit(
-        ((maxX - minX) / 2) * margin * (width / (width - left - right)),
-        ((maxZ - minZ) / 2) * margin * (height / (height - top - bottom)),
+        ((maxX - minX) / 2) * margin * (width / room(width, left, right)),
+        ((maxZ - minZ) / 2) * margin * (height / room(height, top, bottom)),
       )
     // The cities' half size on screen (px) at that distance, with room for their pictures
     const perPx = this.controls.groundOffset(distance, 1, 1, height)
