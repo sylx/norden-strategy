@@ -188,7 +188,6 @@ export class StrategyMap {
       this.renderer.capabilities.getMaxAnisotropy())
     this.marches.onArrive = (id) => { for (const listener of this.arrivalListeners) listener(id) }
     this.overlay.add(this.roadOverview.mesh, this.roadHighlights.group, this.cityHighlights.group, this.marches.group)
-    this.setPlaceSettings(settings.places ?? PLACE_DEFAULTS)
     this.parchment = new ParchmentEffect(this.renderer)
     this.parchment.applySettings(settings.parchment ?? PARCHMENT_DEFAULTS)
     this.parchment.setWorld(this.flow, world.worldSize)
@@ -204,6 +203,7 @@ export class StrategyMap {
       bounds: { minX: s * 0.06, maxX: s * 0.94, minZ: s * 0.1, maxZ: s * 0.94 },
     })
     this.controls.setView(s * 0.52, s * 0.55, 1400)
+    this.setPlaceSettings(settings.places ?? PLACE_DEFAULTS)
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(container)
@@ -226,6 +226,7 @@ export class StrategyMap {
     this.roads.setPixelScale(this.pxScale)
     this.cities.setPixelScale(this.pxScale)
     this.overlayUniforms.setPixelScale(this.pxScale)
+    this.controls.setZoomGap(this.cities.fadeDistances())
   }
 
   setForestSettings(settings: ForestSettings) {
@@ -260,6 +261,7 @@ export class StrategyMap {
     this.cities.applySettings(settings)
     this.cityHighlights.applySettings(settings)
     this.labels.applySettings(settings)
+    this.controls.setZoomGap(this.cities.fadeDistances())
   }
 
   /** The cities drawn, as they are now */

@@ -31,6 +31,9 @@ export function emblemUrl(factionId?: string): string | undefined {
   return emblemImage(factionId ? FACTION_MAP[factionId]?.emblem : undefined)
 }
 
+/** The crossfade between the art and the emblems spans these multiples of emblemSwitchPx */
+const ART_FADE = [0.85, 1.15] as const
+
 /** On-screen width (CSS px) of a town's card at a view depth */
 function townPixels(depth: number, pxScale: number, settings: PlaceSettings) {
   return THREE.MathUtils.clamp((settings.citySize * pxScale) / depth, settings.cityMinPx, settings.cityMaxPx)
@@ -48,7 +51,15 @@ export function cardPixels(type: PlaceType, depth: number, pxScale: number, sett
 export function artVisibility(viewDistance: number, pxScale: number, settings: PlaceSettings) {
   const s = settings.emblemSwitchPx
   if (s <= 0) return 1
-  return THREE.MathUtils.smoothstep(townPixels(viewDistance, pxScale, settings), s * 0.85, s * 1.15)
+  return THREE.MathUtils.smoothstep(townPixels(viewDistance, pxScale, settings), s * ART_FADE[0], s * ART_FADE[1])
+}
+
+/** The view distances of that crossfade, nearest first; null if the zoom cannot leave it on both sides */
+export function artFadeDistances(pxScale: number, settings: PlaceSettings): [number, number] | null {
+  const s = settings.emblemSwitchPx
+  const [low, high] = [s * ART_FADE[0], s * ART_FADE[1]]
+  if (s <= 0 || low < settings.cityMinPx || high > settings.cityMaxPx) return null
+  return [(settings.citySize * pxScale) / high, (settings.citySize * pxScale) / low]
 }
 
 const vertexShader = /* glsl */ `
@@ -299,6 +310,11 @@ export class Cities {
     this.cards.visible = art > 0.001
     this.emblems.visible = art < 0.999
     return art
+  }
+
+  /** The view distances of the crossfade between the art and the emblems (artFadeDistances) */
+  fadeDistances() {
+    return artFadeDistances(this.shared.uPxScale.value, this.settings)
   }
 
   /** CSS px per world unit at view depth 1 */

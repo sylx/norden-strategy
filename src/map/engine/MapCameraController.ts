@@ -32,6 +32,8 @@ export class MapCameraController {
   readonly target = new THREE.Vector3()
   private distance: number
   private targetDistance: number
+  /** Distances (nearest first) the zoom passes through but never comes to rest in */
+  private zoomGap: [number, number] | null = null
   private readonly limits: CameraLimits
   private readonly camera: THREE.PerspectiveCamera
   private readonly dom: HTMLElement
@@ -77,12 +79,18 @@ export class MapCameraController {
   /** Jump to a view instantly */
   setView(x: number, z: number, distance: number) {
     this.target.set(x, this.groundHeight(x, z), z)
-    this.distance = this.targetDistance = this.clampDistance(distance)
+    this.distance = this.targetDistance = this.clearOfGap(this.clampDistance(distance), 1)
     this.zoomAnchor = null
     this.panGoal = null
     this.velocity.set(0, 0)
     this.clampTarget()
     this.applyCamera()
+  }
+
+  /** Sets the distances the zoom must not rest in; a zoom resting there moves to the nearer end */
+  setZoomGap(gap: [number, number] | null) {
+    this.zoomGap = gap
+    if (gap) this.targetDistance = this.clearOfGap(this.targetDistance, this.targetDistance * 2 - gap[0] - gap[1])
   }
 
   /** Glide the look-at point to x/z, keeping the zoom */
@@ -96,7 +104,7 @@ export class MapCameraController {
   /** Glide the look-at point to x/z, easing the zoom to `distance` on the way */
   glideTo(x: number, z: number, distance: number) {
     this.panTo(x, z)
-    this.targetDistance = this.clampDistance(distance)
+    this.targetDistance = this.clearOfGap(this.clampDistance(distance), 1)
   }
 
   /**
@@ -111,7 +119,7 @@ export class MapCameraController {
     for (let i = 0; i < 4; i++) {
       distance = this.clampDistance(Math.max(halfX / tanH, (halfZ * Math.sin(this.pitchAt(distance))) / tanV))
     }
-    return distance
+    return this.clearOfGap(distance, 1)
   }
 
   getView() {
@@ -212,6 +220,15 @@ export class MapCameraController {
 
   private clampDistance(d: number) {
     return THREE.MathUtils.clamp(d, this.limits.minDistance, this.limits.maxDistance)
+  }
+
+  /** A distance inside the zoom gap moves to the gap's end in that direction (< 0: nearer), or the other end past the limits */
+  private clearOfGap(d: number, direction: number) {
+    if (!this.zoomGap) return d
+    const [near, far] = this.zoomGap
+    if (d <= near || d >= far) return d
+    const [end, other] = direction < 0 ? [near, far] : [far, near]
+    return this.clampDistance(end === this.clampDistance(end) ? end : other)
   }
 
   private clampTarget() {
@@ -331,8 +348,8 @@ export class MapCameraController {
   }
 
   private zoomBy(factor: number, clientX: number, clientY: number) {
-    this.targetDistance = this.clampDistance(this.targetDistance * factor)
-    const ndc = this.toNdc(clientX, clientY, new THREE.Vector2())
+    this.targetDistance = this.clearOfGap(this.clampDistance(this.targetDistance * factor), factor - 1)
+    const ndc =this.toNdc(clientX, clientY, new THREE.Vector2())
     const world = this.pickGround(ndc)
     this.zoomAnchor = world ? { world, ndc } : null
     this.panGoal = null
