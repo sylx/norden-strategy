@@ -1,3 +1,4 @@
+/* 文字色は norden-ui の theme.css の変数。norden-strategy 単体で動かすとき（norden-ui を読まない）のために元の色を予備に書く */
 .map-view {
   position: relative;
   width: 100%;
@@ -30,7 +31,7 @@
   inset: 0;
   display: grid;
   place-items: center;
-  color: #e8dcc0;
+  color: var(--norden-text, #e8dcc0);
   font-size: 18px;
   letter-spacing: 0.1em;
   pointer-events: none;
@@ -43,7 +44,7 @@
   padding: 2px 8px;
   border-radius: 4px;
   background: rgb(0 0 0 / 0.45);
-  color: #cfd8e0;
+  color: var(--norden-text-muted, #cfd8e0);
   font: 12px/1.6 ui-monospace, monospace;
   pointer-events: none;
 }
@@ -60,7 +61,7 @@
 }
 
 .map-controls__panel {
-  color: #e4dfc9;
+  color: var(--norden-text, #e4dfc9);
   background: rgb(20 30 25 / 0.94);
   border: 1px solid #66705a;
   border-radius: 8px;
@@ -76,7 +77,7 @@
   font-weight: 600;
 }
 
-.map-controls summary span { float: right; font-size: 11px; color: #afb89c; }
+.map-controls summary span { float: right; font-size: 11px; color: var(--norden-text-muted, #afb89c); }
 .map-controls__body { padding: 0 14px 12px; }
 .map-controls__mode { display: grid; gap: 5px; }
 .map-controls select, .map-controls button {
@@ -97,9 +98,9 @@
 .map-controls fieldset:disabled { opacity: 0.4; }
 .map-controls__slider { display: block; margin: 9px 0; }
 .map-controls__slider span { display: flex; justify-content: space-between; gap: 8px; }
-.map-controls output { font-variant-numeric: tabular-nums; color: #d5c998; }
+.map-controls output { font-variant-numeric: tabular-nums; color: var(--norden-text-accent, #d5c998); }
 .map-controls input[type='range'] { width: 100%; margin: 5px 0 0; accent-color: #b8c58d; }
-.map-controls__note { color: #afb89c; font-size: 11px; margin: 10px 0 0; }
+.map-controls__note { color: var(--norden-text-muted, #afb89c); font-size: 11px; margin: 10px 0 0; }
 .map-controls :focus-visible { outline: 2px solid #e4cf89; outline-offset: 3px; }
 .map-controls__sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 
@@ -121,7 +122,7 @@
   padding: 8px;
   resize: vertical;
   background: #17231c;
-  color: #e4dfc9;
+  color: var(--norden-text, #e4dfc9);
   border: 1px solid #65705b;
   border-radius: 4px;
   font: 11px/1.5 ui-monospace, monospace;
@@ -132,7 +133,7 @@
   padding-top: 10px;
   border-top: 1px solid #3f4a3c;
   font-size: 12px;
-  color: #d5c998;
+  color: var(--norden-text-accent, #d5c998);
 }
 .map-controls__heading:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 .map-controls__field { display: grid; gap: 4px; margin: 8px 0; min-width: 0; }

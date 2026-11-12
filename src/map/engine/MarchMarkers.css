@@ -1,3 +1,4 @@
+/* 文字色は norden-ui の theme.css の変数。norden-strategy 単体で動かすとき（norden-ui を読まない）のために元の色を予備に書く */
 .march-labels {
   position: absolute;
   inset: 0;
@@ -11,7 +12,7 @@
   top: 0;
   padding: 1px 6px 1px 5px;
   white-space: nowrap;
-  color: #fff9df;
+  color: var(--norden-text-strong, #fff9df);
   background: rgb(30 20 12 / 0.72);
   border-left: 3px solid var(--march-color, #c33);
   border-radius: 2px;

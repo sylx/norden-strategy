@@ -1,3 +1,4 @@
+/* 文字色は norden-ui の theme.css の変数。norden-strategy 単体で動かすとき（norden-ui を読まない）のために元の色を予備に書く */
 .place-labels {
   position: absolute;
   inset: 0;
@@ -13,7 +14,7 @@
   align-items: center;
   gap: 3px;
   white-space: nowrap;
-  color: #fff9df;
+  color: var(--norden-text-strong, #fff9df);
   /* Noto Serif JP is loaded by the page (index.html of nordencult / this app) */
   font: 700 var(--place-label-size, 20px)/1.2 "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", serif;
   letter-spacing: 0.06em;
@@ -33,7 +34,7 @@
 }
 
 .place-label--selected {
-  color: #ffe08a;
+  color: var(--norden-text-gold, #ffe08a);
   text-shadow: 0 0 3px #000, 0 0 6px #000c, 0 0 12px #c8901c;
 }
 
