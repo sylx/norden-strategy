@@ -143,7 +143,16 @@ class CellHeap {
   }
 }
 
-export function generateWorld({ resolution = 1024, seed = 1337, places = [] }: GenerateOptions = {}): WorldData {
+/**
+ * Reports how far the world generation has got, 0 to 1. The share of each step
+ * is its rough share of the time (the full-resolution elevation takes the most)
+ */
+export type WorldProgress = (fraction: number) => void
+
+export function generateWorld(
+  { resolution = 1024, seed = 1337, places = [] }: GenerateOptions = {}, onProgress?: WorldProgress,
+): WorldData {
+  const progress = onProgress ?? (() => {})
   const RES = resolution
   const cell = WORLD_SIZE / RES
   const n = createNoise2D(seed)
@@ -173,6 +182,7 @@ export function generateWorld({ resolution = 1024, seed = 1337, places = [] }: G
   const cArch = new Float32Array(CS * CS)
   const cArid = new Float32Array(CS * CS)
   for (let j = 0; j < CS; j++) {
+    if (j % 16 === 0) progress(0.1 * (j / CS))
     for (let i = 0; i < CS; i++) {
       const px = (i / C) * WORLD_SIZE
       const py = (j / C) * WORLD_SIZE
@@ -228,6 +238,7 @@ export function generateWorld({ resolution = 1024, seed = 1337, places = [] }: G
   const craterFloor = new Float32Array(N)
 
   for (let j = 0; j < RES; j++) {
+    if (j % 16 === 0) progress(0.1 + 0.55 * (j / RES))
     for (let i = 0; i < RES; i++) {
       const px = (i + 0.5) * cell
       const py = (j + 0.5) * cell
@@ -316,6 +327,7 @@ export function generateWorld({ resolution = 1024, seed = 1337, places = [] }: G
   }
 
   // --- 3. Drainage: priority-flood from the sea ------------------------------
+  progress(0.65)
   // The flood tree doubles as the flow network: every land cell drains into
   // the neighbour that reached it.
   // Routing uses a slightly roughened surface so rivers meander on plains
@@ -369,6 +381,7 @@ export function generateWorld({ resolution = 1024, seed = 1337, places = [] }: G
     }
   }
 
+  progress(0.75)
   const acc = new Float32Array(N)
   for (let k = 0; k < N; k++) {
     if (elev[k] > 0) acc[k] = (0.6 + Math.max(0, forest[k])) * (1 - 0.9 * aridity[k]) * (1 - craterFloor[k])
@@ -380,6 +393,7 @@ export function generateWorld({ resolution = 1024, seed = 1337, places = [] }: G
   }
 
   // --- 4. Rivers and lakes ---------------------------------------------------
+  progress(0.8)
   const water = new Float32Array(N)
   const flowX = new Float32Array(N)
   const flowY = new Float32Array(N)
@@ -459,6 +473,7 @@ export function generateWorld({ resolution = 1024, seed = 1337, places = [] }: G
   }
 
   // --- 5. Roads ---------------------------------------------------------------
+  progress(0.88)
   const lake = new Uint8Array(N)
   for (let k = 0; k < N; k++) lake[k] = isLake(k) ? 1 : 0
   const { roads, warnings } = planRoads(
@@ -483,6 +498,7 @@ export function generateWorld({ resolution = 1024, seed = 1337, places = [] }: G
   }
 
   // --- 6. Pack ---------------------------------------------------------------
+  progress(0.96)
   const macro = new Float32Array(N * 4)
   const flow = new Float32Array(N * 4)
   for (let k = 0; k < N; k++) {
@@ -504,6 +520,7 @@ export function generateWorld({ resolution = 1024, seed = 1337, places = [] }: G
     flow[k * 4 + 3] = riverSize[k]
   }
 
+  progress(1)
   return { resolution: RES, worldSize: WORLD_SIZE, macro, flow, roads, warnings }
 }
 

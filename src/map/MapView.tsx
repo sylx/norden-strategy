@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { StrategyMap, type FocusInset, type MapStats } from './engine/StrategyMap'
 import { loadWorld } from './world/loadWorld'
+import type { WorldData } from './world/generateWorld'
 import { ForestControls } from './ForestControls'
 import { readForestSettings, saveForestSettings, type ForestSettings } from './engine/forestSettings'
 import { ParchmentControls } from './ParchmentControls'
@@ -82,6 +83,9 @@ export default function MapView({
   const [warnings, setWarnings] = useState<string[]>([])
   const [picked, setPicked] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // How far the world generation has got (0 to 1), and whether the map is being built from it on the main thread
+  const [progress, setProgress] = useState(0)
+  const [building, setBuilding] = useState(false)
   const [stats, setStats] = useState<MapStats | null>(null)
   // The room the focus test takes the UI to cover, drawn over the map
   const [focusInset, setFocusInset] = useState<FocusInset | null>(null)
@@ -93,8 +97,18 @@ export default function MapView({
     let cancelled = false
     // The world is generated for the cities as they are now (a map built again for other pictures generates it again)
     const places = placesOf(citiesRef.current)
-    const job = loadWorld({ places: places.map(({ id, name, type, x, z }) => ({ id, name, type, x, z })) })
+    const job = loadWorld({ places: places.map(({ id, name, type, x, z }) => ({ id, name, type, x, z })) }, setProgress)
+    let frame = 0
     job.promise.then((world) => {
+      if (cancelled) return
+      // Building the map blocks the main thread: show that it is being built first
+      setProgress(1)
+      setBuilding(true)
+      frame = requestAnimationFrame(() => { frame = requestAnimationFrame(() => build(world)) })
+    }, (err: unknown) => {
+      console.error('World generation failed', err)
+    })
+    const build = (world: WorldData) => {
       if (cancelled) return
       for (const warning of world.warnings) console.warn('[placeLayout]', warning)
       setWarnings(world.warnings)
@@ -112,11 +126,10 @@ export default function MapView({
       map.onStats = setStats
       if (import.meta.env.DEV) window.__strategyMap = map
       setLoading(false)
-    }, (err: unknown) => {
-      console.error('World generation failed', err)
-    })
+    }
     return () => {
       cancelled = true
+      cancelAnimationFrame(frame)
       job.cancel()
       map?.dispose()
       mapRef.current = null
@@ -207,7 +220,16 @@ export default function MapView({
   return (
     <div className="map-view">
       <div ref={containerRef} className="map-view__canvas" />
-      {loading && <div className="map-view__loading">地図を生成中…</div>}
+      {loading && (
+        <div className="map-view__loading" role="status">
+          <div className="map-view__loading-box">
+            <div>{building ? '地図を描画中…' : `地図を生成中… ${Math.floor(progress * 100)}%`}</div>
+            <div className="map-view__progress" aria-hidden="true">
+              <div className="map-view__progress-bar" style={{ width: `${progress * 100}%` }} />
+            </div>
+          </div>
+        </div>
+      )}
       {showControls && focusInset && (
         <div className="map-view__inset" aria-hidden="true" style={{
           borderLeftWidth: focusInset.left, borderRightWidth: focusInset.right, borderTopWidth: focusInset.top, borderBottomWidth: focusInset.bottom,

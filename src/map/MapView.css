@@ -37,6 +37,26 @@
   pointer-events: none;
 }
 
+.map-view__loading-box {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.map-view__progress {
+  width: min(280px, 60vw);
+  height: 6px;
+  border: 1px solid color-mix(in srgb, var(--norden-text, #e8dcc0) 45%, transparent);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.map-view__progress-bar {
+  height: 100%;
+  background: var(--norden-text, #e8dcc0);
+  transition: width 0.2s linear;
+}
+
 .map-view__stats {
   position: absolute;
   left: 8px;
