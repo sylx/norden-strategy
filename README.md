@@ -1,3 +1,6 @@
+> [!NOTE]
+> このリポジトリは 2026-11-14 に [nordencult](https://github.com/sylx/nordencult) の [`norden-strategy/`](https://github.com/sylx/nordencult/tree/main/norden-strategy) に移りました（履歴もそのまま取り込んであります）。ここは更新しません。
+
 # norden-strategy
 
 戦略マップを three.js で描画する新プロジェクト（nordencult-old の 2D 地図の置き換え）。
